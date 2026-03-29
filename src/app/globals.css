@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #2D6A4F;
+  --secondary: #52B788;
+  --accent: #F4A261;
+}
+
+html, body {
+  height: 100%;
+  background-color: #F8F9FA;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+body {
+  overscroll-behavior-y: none;
+}
+
+/* Safe area for iPhone notch */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Smooth scrolling */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Remove blue tap highlight */
+button, a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Leaflet z-index fix */
+.leaflet-pane {
+  z-index: 10;
+}
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 20;
+}
