@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Hike } from '@/types';
 import { getAllHikes, getHike as dbGetHike, saveHike, deleteHike as dbDeleteHike } from '@/lib/db';
+import { pushRow, deleteRow } from '@/lib/sync';
 import { genId } from '@/lib/utils';
 
 export function useHikes() {
@@ -33,6 +34,7 @@ export function useHikes() {
       createdAt: new Date().toISOString(),
     };
     await saveHike(hike);
+    pushRow('hikes', hike as unknown as Record<string, unknown>).catch(() => {});
     await loadHikes();
     return hike;
   }, [loadHikes]);
@@ -42,11 +44,13 @@ export function useHikes() {
     if (!existing) throw new Error('Hike not found');
     const updated = { ...existing, ...data };
     await saveHike(updated);
+    pushRow('hikes', updated as unknown as Record<string, unknown>).catch(() => {});
     await loadHikes();
   }, [loadHikes]);
 
   const deleteHike = useCallback(async (id: string): Promise<void> => {
     await dbDeleteHike(id);
+    deleteRow('hikes', id).catch(() => {});
     await loadHikes();
   }, [loadHikes]);
 

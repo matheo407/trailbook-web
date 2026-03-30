@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Stop } from '@/types';
 import { getStopsForHike, saveStop, deleteStop as dbDeleteStop } from '@/lib/db';
+import { pushRow, deleteRow } from '@/lib/sync';
 import { genId } from '@/lib/utils';
 
 export function useStops(hikeId: string) {
@@ -35,6 +36,7 @@ export function useStops(hikeId: string) {
       order: stops.length,
     };
     await saveStop(stop);
+    pushRow('stops', stop as unknown as Record<string, unknown>).catch(() => {});
     await loadStops();
     return stop;
   }, [hikeId, stops.length, loadStops]);
@@ -44,17 +46,20 @@ export function useStops(hikeId: string) {
     if (!existing) throw new Error('Stop not found');
     const updated = { ...existing, ...data };
     await saveStop(updated);
+    pushRow('stops', updated as unknown as Record<string, unknown>).catch(() => {});
     await loadStops();
   }, [stops, loadStops]);
 
   const deleteStop = useCallback(async (id: string): Promise<void> => {
     await dbDeleteStop(id);
+    deleteRow('stops', id).catch(() => {});
     await loadStops();
   }, [loadStops]);
 
   const reorderStops = useCallback(async (reordered: Stop[]): Promise<void> => {
     const updated = reordered.map((stop, index) => ({ ...stop, order: index }));
     await Promise.all(updated.map((stop) => saveStop(stop)));
+    updated.forEach((stop) => pushRow('stops', stop as unknown as Record<string, unknown>).catch(() => {}));
     setStops(updated);
   }, []);
 

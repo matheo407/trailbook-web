@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Companion } from '@/types';
 import { getAllCompanions, saveCompanion, deleteCompanion as dbDeleteCompanion } from '@/lib/db';
+import { pushRow, deleteRow } from '@/lib/sync';
 import { genId } from '@/lib/utils';
 
 export function useCompanions() {
@@ -33,6 +34,7 @@ export function useCompanions() {
       createdAt: new Date().toISOString(),
     };
     await saveCompanion(companion);
+    pushRow('companions', companion as unknown as Record<string, unknown>).catch(() => {});
     await loadCompanions();
     return companion;
   }, [loadCompanions]);
@@ -42,11 +44,13 @@ export function useCompanions() {
     if (!existing) throw new Error('Companion not found');
     const updated = { ...existing, ...data };
     await saveCompanion(updated);
+    pushRow('companions', updated as unknown as Record<string, unknown>).catch(() => {});
     await loadCompanions();
   }, [companions, loadCompanions]);
 
   const deleteCompanion = useCallback(async (id: string): Promise<void> => {
     await dbDeleteCompanion(id);
+    deleteRow('companions', id).catch(() => {});
     await loadCompanions();
   }, [loadCompanions]);
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GearItem } from '@/types';
 import { getAllGearItems, saveGearItem, deleteGearItem as dbDeleteGearItem } from '@/lib/db';
+import { pushRow, deleteRow } from '@/lib/sync';
 import { genId } from '@/lib/utils';
 
 export function useGear() {
@@ -33,6 +34,7 @@ export function useGear() {
       createdAt: new Date().toISOString(),
     };
     await saveGearItem(item);
+    pushRow('gear_items', item as unknown as Record<string, unknown>).catch(() => {});
     await loadGear();
     return item;
   }, [loadGear]);
@@ -42,11 +44,13 @@ export function useGear() {
     if (!existing) throw new Error('Gear item not found');
     const updated = { ...existing, ...data };
     await saveGearItem(updated);
+    pushRow('gear_items', updated as unknown as Record<string, unknown>).catch(() => {});
     await loadGear();
   }, [gearItems, loadGear]);
 
   const deleteGearItem = useCallback(async (id: string): Promise<void> => {
     await dbDeleteGearItem(id);
+    deleteRow('gear_items', id).catch(() => {});
     await loadGear();
   }, [loadGear]);
 

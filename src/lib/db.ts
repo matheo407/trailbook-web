@@ -84,6 +84,11 @@ export async function deleteGearItem(id: string): Promise<void> {
 }
 
 // Stops
+export async function getAllStops(): Promise<Stop[]> {
+  const db = await getDb();
+  return db.getAll('stops');
+}
+
 export async function getStopsForHike(hikeId: string): Promise<Stop[]> {
   const db = await getDb();
   const stops = await db.getAllFromIndex('stops', 'hikeId', hikeId);

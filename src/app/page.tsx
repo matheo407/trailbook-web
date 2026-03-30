@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import Link from 'next/link';
 import { useHikes } from '@/hooks/useHikes';
 import HikeCard from '@/components/HikeCard';
+import SyncBanner from '@/components/SyncBanner';
 import { calculateStats } from '@/lib/stats';
 import { Plus, TrendingUp, Map, CheckCircle2, HardDrive } from 'lucide-react';
 
@@ -85,8 +86,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Sync banner */}
+      <div className="px-4 mt-4">
+        <SyncBanner />
+      </div>
+
       {/* Quick actions */}
-      <div className="px-4 mt-4 flex gap-2">
+      <div className="px-4 mt-3 flex gap-2">
         <Link href="/carte" className="flex-1 flex flex-col items-center gap-1 bg-white rounded-2xl border border-gray-100 py-3 shadow-sm active:scale-[0.98] transition-transform">
           <Map size={18} className="text-[#2D6A4F]" />
           <span className="text-xs font-medium text-gray-600">Carte</span>
