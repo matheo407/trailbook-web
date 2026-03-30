@@ -21,6 +21,7 @@ const gearCategoryLabel: Record<string, string> = {
   équipement: 'Équipement',
   sécurité: 'Sécurité',
   navigation: 'Navigation',
+  médical: 'Médical',
   autre: 'Autre',
 };
 

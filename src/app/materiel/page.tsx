@@ -6,7 +6,7 @@ import { useGear } from '@/hooks/useGear';
 import { GearCategory, GearItem } from '@/types';
 
 const categories: GearCategory[] = [
-  'vêtements', 'nourriture', 'équipement', 'sécurité', 'navigation', 'autre'
+  'vêtements', 'nourriture', 'équipement', 'sécurité', 'navigation', 'médical', 'autre'
 ];
 
 const categoryLabel: Record<GearCategory, string> = {
@@ -15,6 +15,7 @@ const categoryLabel: Record<GearCategory, string> = {
   équipement:  'Équipement',
   sécurité:    'Sécurité',
   navigation:  'Navigation',
+  médical:     'Médical',
   autre:       'Autre',
 };
 
@@ -24,6 +25,7 @@ const categoryEmoji: Record<GearCategory, string> = {
   équipement:  '🎒',
   sécurité:    '🩹',
   navigation:  '🧭',
+  médical:     '💊',
   autre:       '📦',
 };
 

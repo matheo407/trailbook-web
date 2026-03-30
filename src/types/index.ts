@@ -1,7 +1,7 @@
 export type Difficulty = 'facile' | 'moyen' | 'difficile';
 export type HikeStatus = 'faite' | 'planifiée';
 export type StopType = 'repas' | 'repos' | 'bivouac' | 'point_de_vue' | 'autre';
-export type GearCategory = 'vêtements' | 'nourriture' | 'équipement' | 'sécurité' | 'navigation' | 'autre';
+export type GearCategory = 'vêtements' | 'nourriture' | 'équipement' | 'sécurité' | 'navigation' | 'médical' | 'autre';
 
 export interface Coordinate {
   lat: number;
