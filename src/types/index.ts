@@ -6,6 +6,7 @@ export type GearCategory = 'vêtements' | 'nourriture' | 'équipement' | 'sécur
 export interface Coordinate {
   lat: number;
   lng: number;
+  ele?: number;
 }
 
 export interface Companion {
@@ -39,6 +40,7 @@ export interface Stop {
   coordinate?: Coordinate;
   order: number;
   mealDetails?: string;
+  journal?: string;
 }
 
 export interface NamedLocation {
@@ -66,5 +68,6 @@ export interface Hike {
   gear: HikeGearItem[];
   departureLocation?: NamedLocation;
   arrivalLocation?: NamedLocation;
+  tags: string[];
   createdAt: string;
 }

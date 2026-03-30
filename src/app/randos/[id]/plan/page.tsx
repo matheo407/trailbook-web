@@ -39,9 +39,10 @@ interface StopFormData {
   type: StopType;
   notes: string;
   mealDetails: string;
+  journal: string;
 }
 
-const defaultForm: StopFormData = { name: '', type: 'repos', notes: '', mealDetails: '' };
+const defaultForm: StopFormData = { name: '', type: 'repos', notes: '', mealDetails: '', journal: '' };
 
 export default function PlanPage() {
   const { id } = useParams<{ id: string }>();
@@ -76,6 +77,7 @@ export default function PlanPage() {
         type: form.type,
         notes: form.notes.trim() || undefined,
         mealDetails: form.type === 'repas' && form.mealDetails.trim() ? form.mealDetails.trim() : undefined,
+        journal: form.journal.trim() || undefined,
       });
       setForm(defaultForm);
       setAddingStop(false);
@@ -93,6 +95,7 @@ export default function PlanPage() {
         type: form.type,
         notes: form.notes.trim() || undefined,
         mealDetails: form.type === 'repas' && form.mealDetails.trim() ? form.mealDetails.trim() : undefined,
+        journal: form.journal.trim() || undefined,
       });
       setEditingStopId(null);
       setForm(defaultForm);
@@ -108,6 +111,7 @@ export default function PlanPage() {
       type: stop.type,
       notes: stop.notes || '',
       mealDetails: stop.mealDetails || '',
+      journal: stop.journal || '',
     });
     setAddingStop(false);
   };
@@ -331,6 +335,23 @@ export default function PlanPage() {
       {/* Tab: Matériel */}
       {activeTab === 'materiel' && (
         <div className="px-4 pt-4 space-y-4">
+          {/* Bag weight summary */}
+          {(() => {
+            const totalWeight = hike.gear
+              .filter((g) => g.packed)
+              .reduce((sum, g) => {
+                const item = gearItems.find((i) => i.id === g.gearId);
+                return sum + (item?.weight || 0);
+              }, 0);
+            if (totalWeight === 0) return null;
+            const kg = (totalWeight / 1000).toFixed(2);
+            return (
+              <div className="flex items-center justify-between bg-[#2D6A4F]/10 rounded-2xl px-4 py-3">
+                <span className="text-sm font-semibold text-[#2D6A4F]">🎒 Poids total du sac</span>
+                <span className="text-sm font-bold text-[#2D6A4F]">{totalWeight >= 1000 ? `${kg} kg` : `${totalWeight} g`}</span>
+              </div>
+            );
+          })()}
           {gearLoading ? (
             <div className="text-center py-8">
               <div className="w-6 h-6 border-2 border-[#2D6A4F] border-t-transparent rounded-full animate-spin mx-auto" />
@@ -406,7 +427,7 @@ function StopForm({
   saving,
   label,
 }: {
-  form: { name: string; type: StopType; notes: string; mealDetails: string };
+  form: { name: string; type: StopType; notes: string; mealDetails: string; journal: string };
   setForm: (f: any) => void;
   onSave: () => void;
   onCancel: () => void;
@@ -457,6 +478,14 @@ function StopForm({
         placeholder="Notes (optionnel)"
         value={form.notes}
         onChange={(e) => setForm((f: any) => ({ ...f, notes: e.target.value }))}
+      />
+
+      <textarea
+        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F] resize-none"
+        placeholder="📓 Journal — raconte cette étape librement..."
+        rows={3}
+        value={form.journal}
+        onChange={(e) => setForm((f: any) => ({ ...f, journal: e.target.value }))}
       />
 
       <div className="flex gap-2">

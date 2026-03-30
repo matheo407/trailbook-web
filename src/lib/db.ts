@@ -107,3 +107,34 @@ export async function deleteStopsForHike(hikeId: string): Promise<void> {
   await Promise.all(stops.map((stop) => tx.store.delete(stop.id)));
   await tx.done;
 }
+
+// Backup & Restore
+export async function exportAllData(): Promise<string> {
+  const db = await getDb();
+  const [hikes, companions, gearItems, stops] = await Promise.all([
+    db.getAll('hikes'),
+    db.getAll('companions'),
+    db.getAll('gear_items'),
+    db.getAll('stops'),
+  ]);
+  return JSON.stringify({ hikes, companions, gearItems, stops, exportedAt: new Date().toISOString() }, null, 2);
+}
+
+export async function importAllData(json: string): Promise<void> {
+  const data = JSON.parse(json);
+  const db = await getDb();
+  const tx = db.transaction(['hikes', 'companions', 'gear_items', 'stops'], 'readwrite');
+  await Promise.all([
+    tx.objectStore('hikes').clear(),
+    tx.objectStore('companions').clear(),
+    tx.objectStore('gear_items').clear(),
+    tx.objectStore('stops').clear(),
+  ]);
+  const puts: Promise<unknown>[] = [];
+  (data.hikes || []).forEach((h: Hike) => puts.push(tx.objectStore('hikes').put(h)));
+  (data.companions || []).forEach((c: Companion) => puts.push(tx.objectStore('companions').put(c)));
+  (data.gearItems || []).forEach((g: GearItem) => puts.push(tx.objectStore('gear_items').put(g)));
+  (data.stops || []).forEach((s: Stop) => puts.push(tx.objectStore('stops').put(s)));
+  await Promise.all(puts);
+  await tx.done;
+}

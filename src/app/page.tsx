@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useHikes } from '@/hooks/useHikes';
 import HikeCard from '@/components/HikeCard';
 import { calculateStats } from '@/lib/stats';
-import { Plus, TrendingUp, Map, CheckCircle2 } from 'lucide-react';
+import { Plus, TrendingUp, Map, CheckCircle2, HardDrive } from 'lucide-react';
 
 export default function DashboardPage() {
   const { hikes, loading } = useHikes();
@@ -83,6 +83,18 @@ export default function DashboardPage() {
             <p className="text-xs text-gray-500 mt-0.5">Dénivelé (m)</p>
           </div>
         </div>
+      </div>
+
+      {/* Quick actions */}
+      <div className="px-4 mt-4 flex gap-2">
+        <Link href="/carte" className="flex-1 flex flex-col items-center gap-1 bg-white rounded-2xl border border-gray-100 py-3 shadow-sm active:scale-[0.98] transition-transform">
+          <Map size={18} className="text-[#2D6A4F]" />
+          <span className="text-xs font-medium text-gray-600">Carte</span>
+        </Link>
+        <Link href="/sauvegarde" className="flex-1 flex flex-col items-center gap-1 bg-white rounded-2xl border border-gray-100 py-3 shadow-sm active:scale-[0.98] transition-transform">
+          <HardDrive size={18} className="text-[#2D6A4F]" />
+          <span className="text-xs font-medium text-gray-600">Sauvegarde</span>
+        </Link>
       </div>
 
       <div className="px-4 mt-6 space-y-6 pb-6">

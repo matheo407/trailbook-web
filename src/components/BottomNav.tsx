@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Mountain, Map, Backpack, BarChart2 } from 'lucide-react';
+import { Home, Mountain, Clock, Backpack, BarChart2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const tabs = [
   { href: '/', label: 'Tableau', icon: Home },
   { href: '/randos', label: 'Randos', icon: Mountain },
-  { href: '/carte', label: 'Carte', icon: Map },
+  { href: '/timeline', label: 'Timeline', icon: Clock },
   { href: '/materiel', label: 'Matériel', icon: Backpack },
   { href: '/stats', label: 'Stats', icon: BarChart2 },
 ];

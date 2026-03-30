@@ -10,6 +10,7 @@ import PhotoUpload from '@/components/PhotoUpload';
 import RatingStars from '@/components/RatingStars';
 import RouteDrawer from '@/components/RouteDrawer';
 import PlaceSearch, { PlaceResult } from '@/components/PlaceSearch';
+import TagInput from '@/components/TagInput';
 import { Coordinate, Difficulty, HikeStatus, NamedLocation } from '@/types';
 import { ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,7 @@ export default function NewHikePage() {
   const [comments, setComments] = useState('');
   const [departureLocation, setDepartureLocation] = useState<NamedLocation | undefined>();
   const [arrivalLocation, setArrivalLocation] = useState<NamedLocation | undefined>();
+  const [tags, setTags] = useState<string[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +72,7 @@ export default function NewHikePage() {
         gear: [],
         departureLocation,
         arrivalLocation,
+        tags,
       });
       router.push(`/randos/${hike.id}`);
     } finally {
@@ -230,10 +233,16 @@ export default function NewHikePage() {
             onRemove={(idx) => setPhotos(photos.filter((_, i) => i !== idx))} />
         </div>
 
+        {/* Tags */}
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tags</label>
+          <TagInput tags={tags} onChange={setTags} />
+        </div>
+
         {/* Route */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tracé sur la carte</label>
-          <RouteDrawer route={route} onChange={setRoute} />
+          <RouteDrawer route={route} onChange={setRoute} hikeName={name || 'tracé'} />
         </div>
 
         {/* Comments */}

@@ -13,11 +13,14 @@ import StatusBadge from '@/components/StatusBadge';
 import RatingStars from '@/components/RatingStars';
 import RouteMap from '@/components/RouteMap';
 import StopCard from '@/components/StopCard';
+import WeatherCard from '@/components/WeatherCard';
+import ElevationProfile from '@/components/ElevationProfile';
 import {
   ChevronLeft,
   Pencil,
   Trash2,
   Download,
+  Share2,
   MapPin,
   Calendar,
   Ruler,
@@ -42,6 +45,7 @@ export default function HikeDetailPage() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -76,6 +80,40 @@ export default function HikeDetailPage() {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleShare = async () => {
+    if (!hike) return;
+    const hikeCompanions = companions.filter((c) => hike.companionIds.includes(c.id));
+    const data = {
+      name: hike.name,
+      status: hike.status,
+      date: hike.date,
+      distance: hike.distance,
+      elevation: hike.elevation,
+      duration: hike.duration,
+      difficulty: hike.difficulty,
+      region: hike.region,
+      description: hike.description,
+      rating: hike.rating,
+      comments: hike.comments,
+      tags: hike.tags,
+      departureLocation: hike.departureLocation ? { name: hike.departureLocation.name } : undefined,
+      arrivalLocation: hike.arrivalLocation ? { name: hike.arrivalLocation.name } : undefined,
+      companionNames: hikeCompanions.map((c) => c.name),
+      stops: stops.map((s) => ({ name: s.name, type: s.type, notes: s.notes, mealDetails: s.mealDetails, journal: s.journal })),
+      sharedAt: new Date().toISOString(),
+    };
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+    const url = `${window.location.origin}/share?d=${encoded}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // fallback: open in new tab
+      window.open(url, '_blank');
+    }
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 3000);
   };
 
   const handleExport = () => {
@@ -212,7 +250,24 @@ export default function HikeDetailPage() {
               <RatingStars value={hike.rating} size={20} />
             </div>
           )}
+
+          {hike.tags && hike.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {hike.tags.map((tag) => (
+                <span key={tag} className="inline-flex items-center px-2.5 py-1 bg-[#2D6A4F]/10 text-[#2D6A4F] text-xs font-medium rounded-xl">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* Weather */}
+        {hike.status === 'planifiée' && hike.departureLocation && (
+          <section className="mb-4">
+            <WeatherCard location={hike.departureLocation} />
+          </section>
+        )}
 
         {/* Route map */}
         {hike.route.length > 0 && (
@@ -222,6 +277,13 @@ export default function HikeDetailPage() {
               <h2 className="font-semibold text-gray-900 text-sm">Tracé</h2>
             </div>
             <RouteMap route={hike.route} stops={stops} />
+          </section>
+        )}
+
+        {/* Elevation profile */}
+        {hike.route.some((c) => c.ele !== undefined) && (
+          <section className="mb-4">
+            <ElevationProfile route={hike.route} />
           </section>
         )}
 
@@ -321,7 +383,14 @@ export default function HikeDetailPage() {
         )}
 
         {/* Actions */}
-        <div className="flex gap-3 pb-6">
+        <div className="flex gap-2 pb-6">
+          <button
+            onClick={handleShare}
+            className="flex items-center justify-center gap-1.5 py-3 px-3 rounded-2xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold shadow-sm active:scale-[0.98] transition-transform"
+          >
+            <Share2 size={15} />
+            {shareCopied ? 'Copié !' : 'Partager'}
+          </button>
           <button
             onClick={handleExport}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold shadow-sm active:scale-[0.98] transition-transform"

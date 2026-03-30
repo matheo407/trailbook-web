@@ -13,12 +13,23 @@ export default function RandosPage() {
   const { hikes, loading } = useHikes();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    hikes.forEach((h) => h.tags?.forEach((t) => tagSet.add(t)));
+    return Array.from(tagSet).sort();
+  }, [hikes]);
 
   const filtered = useMemo(() => {
     let result = [...hikes];
 
     if (filter !== 'all') {
       result = result.filter((h) => h.status === filter);
+    }
+
+    if (selectedTag) {
+      result = result.filter((h) => h.tags?.includes(selectedTag));
     }
 
     if (search.trim()) {
@@ -29,7 +40,8 @@ export default function RandosPage() {
           h.region?.toLowerCase().includes(q) ||
           h.description?.toLowerCase().includes(q) ||
           h.departureLocation?.name.toLowerCase().includes(q) ||
-          h.arrivalLocation?.name.toLowerCase().includes(q)
+          h.arrivalLocation?.name.toLowerCase().includes(q) ||
+          h.tags?.some((t) => t.includes(q))
       );
     }
 
@@ -39,7 +51,7 @@ export default function RandosPage() {
       if (!b.date) return -1;
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [hikes, search, filter]);
+  }, [hikes, search, filter, selectedTag]);
 
   const tabs: { value: Filter; label: string }[] = [
     { value: 'all', label: 'Toutes' },
@@ -82,6 +94,26 @@ export default function RandosPage() {
             </button>
           ))}
         </div>
+
+        {/* Tag filter chips */}
+        {allTags.length > 0 && (
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5 mt-2 scrollbar-hide">
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                className={cn(
+                  'flex-shrink-0 px-2.5 py-1 rounded-xl text-xs font-medium transition-all duration-150',
+                  selectedTag === tag
+                    ? 'bg-[#2D6A4F] text-white'
+                    : 'bg-[#F8F9FA] text-gray-500 border border-gray-200'
+                )}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* List */}

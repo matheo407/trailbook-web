@@ -40,6 +40,12 @@ export default function StopCard({ stop, index }: Props) {
             <span className="text-gray-600">{stop.mealDetails}</span>
           </div>
         )}
+        {stop.journal && (
+          <div className="mt-2 bg-white/70 rounded-lg p-2.5 border-l-2 border-[#52B788]">
+            <p className="text-xs font-medium text-[#2D6A4F] mb-1">📓 Journal</p>
+            <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-line">{stop.journal}</p>
+          </div>
+        )}
         {stop.coordinate && (
           <p className="text-xs text-gray-400 mt-1">
             {stop.coordinate.lat.toFixed(4)}, {stop.coordinate.lng.toFixed(4)}
