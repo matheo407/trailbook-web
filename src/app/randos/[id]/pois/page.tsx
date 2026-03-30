@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { ChevronLeft, RefreshCw, Droplets, Mountain, Tent, Eye, Trees, MapPin, Utensils, History, AlertCircle } from 'lucide-react';
+import { ChevronLeft, RefreshCw, Droplets, Mountain, Tent, Eye, Trees, MapPin, Utensils, History, AlertCircle, Bookmark, BookmarkCheck } from 'lucide-react';
 import { useHikes } from '@/hooks/useHikes';
 import { fetchPOIs, POI } from '@/lib/overpass';
-import { Hike, Coordinate } from '@/types';
+import { Hike, Coordinate, SavedPOI } from '@/types';
 
 const POIMap = dynamic(() => import('./POIMap'), { ssr: false });
 
@@ -34,7 +34,7 @@ const ALL_FILTER = 'Tous';
 export default function POIsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { getHike } = useHikes();
+  const { getHike, updateHike } = useHikes();
 
   const [hike, setHike] = useState<Hike | null>(null);
   const [pois, setPois] = useState<POI[]>([]);
@@ -74,9 +74,21 @@ export default function POIsPage() {
 
   useEffect(() => {
     if (hike) {
-      loadPOIs(hike.route);
+      const allCoords = hike.routes.flatMap((s) => s.coordinates);
+      loadPOIs(allCoords);
     }
   }, [hike, loadPOIs]);
+
+  const toggleSavePOI = async (poi: POI) => {
+    if (!hike) return;
+    const isSaved = hike.savedPois.some((p) => p.id === poi.id);
+    const newSaved: SavedPOI[] = isSaved
+      ? hike.savedPois.filter((p) => p.id !== poi.id)
+      : [...hike.savedPois, { id: poi.id, name: poi.name, type: poi.type, lat: poi.lat, lng: poi.lng }];
+    const updated = { ...hike, savedPois: newSaved };
+    setHike(updated);
+    await updateHike(hike.id, { savedPois: newSaved });
+  };
 
   const types = [ALL_FILTER, ...Array.from(new Set(pois.map((p) => p.type)))];
   const filtered = filter === ALL_FILTER ? pois : pois.filter((p) => p.type === filter);
@@ -113,9 +125,9 @@ export default function POIsPage() {
                 Carte
               </button>
             </div>
-            {hike && hike.route.length >= 2 && (
+            {hike && hike.routes.flatMap((s) => s.coordinates).length >= 2 && (
               <button
-                onClick={() => loadPOIs(hike.route)}
+                onClick={() => loadPOIs(hike.routes.flatMap((s) => s.coordinates))}
                 className="p-2 text-[#2D6A4F]"
                 disabled={loading}
               >
@@ -142,7 +154,7 @@ export default function POIsPage() {
           <div>
             <p className="text-sm text-amber-800 font-medium">Information</p>
             <p className="text-sm text-amber-700 mt-0.5">{error}</p>
-            {hike && hike.route.length < 2 && (
+            {hike && hike.routes.flatMap((s) => s.coordinates).length < 2 && (
               <Link
                 href={`/randos/${id}/edit`}
                 className="inline-block mt-2 text-xs text-[#2D6A4F] font-medium underline underline-offset-2"
@@ -184,7 +196,7 @@ export default function POIsPage() {
           {/* Map view */}
           {view === 'map' && hike && (
             <div className="mx-4 mt-4 rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: 400 }}>
-              <POIMap route={hike.route} pois={filtered} />
+              <POIMap route={hike.routes.flatMap((s) => s.coordinates)} pois={filtered} />
             </div>
           )}
 
@@ -209,16 +221,21 @@ export default function POIsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 text-sm">{poi.name}</p>
-                      <p
-                        className="text-xs mt-0.5 font-medium"
-                        style={{ color: config.color }}
-                      >
-                        {poi.type}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-0.5 font-mono">
-                        {poi.lat.toFixed(4)}, {poi.lng.toFixed(4)}
-                      </p>
+                      <p className="text-xs mt-0.5 font-medium" style={{ color: config.color }}>{poi.type}</p>
+                      <p className="text-xs text-gray-400 mt-0.5 font-mono">{poi.lat.toFixed(4)}, {poi.lng.toFixed(4)}</p>
                     </div>
+                    <button
+                      onClick={() => toggleSavePOI(poi)}
+                      className={`p-2 rounded-xl flex-shrink-0 transition-colors ${
+                        hike?.savedPois.some((p) => p.id === poi.id)
+                          ? 'text-[#2D6A4F] bg-green-50'
+                          : 'text-gray-300 bg-gray-50'
+                      }`}
+                    >
+                      {hike?.savedPois.some((p) => p.id === poi.id)
+                        ? <BookmarkCheck size={16} />
+                        : <Bookmark size={16} />}
+                    </button>
                   </div>
                 );
               })}

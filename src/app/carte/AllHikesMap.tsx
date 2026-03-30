@@ -27,9 +27,10 @@ export default function AllHikesMap({ hikes }: { hikes: Hike[] }) {
     const allPoints: [number, number][] = [];
 
     hikes.forEach((hike) => {
-      if (!hike.route || hike.route.length < 2 || !mapRef.current) return;
+      const allCoords = hike.routes?.flatMap((s) => s.coordinates) ?? [];
+      if (allCoords.length < 2 || !mapRef.current) return;
 
-      const positions = hike.route.map((c) => [c.lat, c.lng] as [number, number]);
+      const positions = allCoords.map((c: { lat: number; lng: number }) => [c.lat, c.lng] as [number, number]);
       const color = hike.status === 'faite' ? '#2D6A4F' : '#74C0FC';
 
       const polyline = L.polyline(positions, {
@@ -68,7 +69,7 @@ export default function AllHikesMap({ hikes }: { hikes: Hike[] }) {
       startMarker.addTo(mapRef.current);
       layersRef.current.push(startMarker);
 
-      positions.forEach((p) => allPoints.push(p));
+      positions.forEach((p: [number, number]) => allPoints.push(p));
     });
 
     // Fit bounds if routes exist

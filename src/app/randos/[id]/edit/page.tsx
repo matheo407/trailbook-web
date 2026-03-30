@@ -9,10 +9,11 @@ import { getHike } from '@/lib/db';
 import CompanionSelector from '@/components/CompanionSelector';
 import PhotoUpload from '@/components/PhotoUpload';
 import RatingStars from '@/components/RatingStars';
-import RouteDrawer from '@/components/RouteDrawer';
+import MultiRouteDrawer from '@/components/MultiRouteDrawer';
 import PlaceSearch, { PlaceResult } from '@/components/PlaceSearch';
 import TagInput from '@/components/TagInput';
-import { Coordinate, Difficulty, HikeStatus, Hike, NamedLocation } from '@/types';
+import { RouteSegment, Difficulty, HikeStatus, Hike, NamedLocation } from '@/types';
+import { genId } from '@/lib/utils';
 import { ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -46,11 +47,12 @@ export default function EditHikePage() {
   const [rating, setRating] = useState(0);
   const [companionIds, setCompanionIds] = useState<string[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
-  const [route, setRoute] = useState<Coordinate[]>([]);
+  const [routes, setRoutes] = useState<RouteSegment[]>([]);
   const [comments, setComments] = useState('');
   const [departureLocation, setDepartureLocation] = useState<NamedLocation | undefined>();
   const [arrivalLocation, setArrivalLocation] = useState<NamedLocation | undefined>();
   const [tags, setTags] = useState<string[]>([]);
+  const [dateEnd, setDateEnd] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -72,8 +74,9 @@ export default function EditHikePage() {
       setRating(h.rating || 0);
       setCompanionIds(h.companionIds);
       setPhotos(h.photos);
-      setRoute(h.route);
+      setRoutes(h.routes.length > 0 ? h.routes : [{ id: genId(), name: 'Tracé principal', coordinates: [] }]);
       setComments(h.comments || '');
+      setDateEnd(h.dateEnd || '');
       setDepartureLocation(h.departureLocation);
       setArrivalLocation(h.arrivalLocation);
       setTags(h.tags || []);
@@ -100,11 +103,13 @@ export default function EditHikePage() {
         region: region.trim() || undefined,
         description: description.trim() || undefined,
         rating: status === 'faite' && rating > 0 ? rating : undefined,
-        companionIds, photos, route,
+        companionIds, photos,
+        routes: routes.filter((s) => s.coordinates.length > 0),
         comments: comments.trim() || undefined,
         departureLocation,
         arrivalLocation,
         tags,
+        dateEnd: dateEnd || undefined,
       });
       router.push(`/randos/${id}`);
     } finally {
@@ -156,10 +161,18 @@ export default function EditHikePage() {
         </div>
 
         {/* Date */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Date</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-            className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F]" />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Date de départ</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+              className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F]" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Date de fin</label>
+            <input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)}
+              min={date || undefined}
+              className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F]" />
+          </div>
         </div>
 
         {/* Distance & Dénivelé */}
@@ -276,10 +289,10 @@ export default function EditHikePage() {
           <TagInput tags={tags} onChange={setTags} />
         </div>
 
-        {/* Route */}
+        {/* Routes */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tracé sur la carte</label>
-          <RouteDrawer route={route} onChange={setRoute} hikeName={name || 'tracé'} />
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tracés sur la carte</label>
+          <MultiRouteDrawer routes={routes} onChange={setRoutes} hikeName={name || 'tracé'} />
         </div>
 
         {/* Comments */}

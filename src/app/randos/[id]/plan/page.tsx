@@ -133,7 +133,21 @@ export default function PlanPage() {
         g.gearId === gearId ? { ...g, packed: !g.packed } : g
       );
     } else {
-      newGear = [...hike.gear, { gearId, packed: true }];
+      newGear = [...hike.gear, { gearId, packed: true, quantity: 1 }];
+    }
+    const updated = { ...hike, gear: newGear };
+    setHike(updated);
+    await updateHike(hike.id, { gear: newGear });
+  };
+
+  const setGearQuantity = async (gearId: string, quantity: number) => {
+    if (!hike || quantity < 1) return;
+    const existing = hike.gear.find((g) => g.gearId === gearId);
+    let newGear;
+    if (existing) {
+      newGear = hike.gear.map((g) => g.gearId === gearId ? { ...g, quantity } : g);
+    } else {
+      newGear = [...hike.gear, { gearId, packed: true, quantity }];
     }
     const updated = { ...hike, gear: newGear };
     setHike(updated);
@@ -213,9 +227,9 @@ export default function PlanPage() {
       </div>
 
       {/* Map (always visible) */}
-      {hike.route.length > 0 && (
+      {hike.routes.some((s) => s.coordinates.length > 0) && (
         <div className="px-4 pt-4">
-          <RouteMap route={hike.route} stops={stops} height={200} />
+          <RouteMap routes={hike.routes} stops={stops} height={200} />
         </div>
       )}
 
@@ -341,7 +355,7 @@ export default function PlanPage() {
               .filter((g) => g.packed)
               .reduce((sum, g) => {
                 const item = gearItems.find((i) => i.id === g.gearId);
-                return sum + (item?.weight || 0);
+                return sum + (item?.weight || 0) * (g.quantity ?? 1);
               }, 0);
             if (totalWeight === 0) return null;
             const kg = (totalWeight / 1000).toFixed(2);
@@ -378,35 +392,34 @@ export default function PlanPage() {
                 <div className="divide-y divide-gray-50">
                   {items.map((item) => {
                     const hikeGear = hike.gear.find((g) => g.gearId === item.id);
-                    const isSelected = !!hikeGear;
                     const isPacked = hikeGear?.packed ?? false;
+                    const qty = hikeGear?.quantity ?? 1;
                     return (
-                      <button
-                        key={item.id}
-                        onClick={() => toggleGear(item.id)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-gray-50 transition-colors"
-                      >
-                        <div
+                      <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+                        <button
+                          onClick={() => toggleGear(item.id)}
                           className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                            isPacked
-                              ? 'bg-[#2D6A4F] border-[#2D6A4F]'
-                              : 'border-gray-300'
+                            isPacked ? 'bg-[#2D6A4F] border-[#2D6A4F]' : 'border-gray-300'
                           }`}
                         >
                           {isPacked && <Check size={14} strokeWidth={3} className="text-white" />}
-                        </div>
+                        </button>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium ${isPacked ? 'text-gray-900' : 'text-gray-500'}`}>
-                            {item.name}
-                          </p>
+                          <p className={`text-sm font-medium ${isPacked ? 'text-gray-900' : 'text-gray-500'}`}>{item.name}</p>
                           {item.weight && (
-                            <p className="text-xs text-gray-400">{item.weight}g</p>
+                            <p className="text-xs text-gray-400">{item.weight * qty}g {qty > 1 ? `(${qty}×${item.weight}g)` : ''}</p>
                           )}
                         </div>
-                        {item.notes && (
-                          <p className="text-xs text-gray-400 truncate max-w-[80px]">{item.notes}</p>
+                        {isPacked && (
+                          <div className="flex items-center gap-1 bg-gray-100 rounded-xl px-1.5 py-0.5">
+                            <button type="button" onClick={() => setGearQuantity(item.id, qty - 1)} disabled={qty <= 1}
+                              className="w-6 h-6 flex items-center justify-center text-gray-600 disabled:opacity-30 text-base font-bold">−</button>
+                            <span className="text-xs font-semibold text-gray-800 min-w-[16px] text-center">{qty}</span>
+                            <button type="button" onClick={() => setGearQuantity(item.id, qty + 1)}
+                              className="w-6 h-6 flex items-center justify-center text-gray-600 text-base font-bold">+</button>
+                          </div>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>

@@ -1,18 +1,19 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Coordinate, Stop } from '@/types';
+import { RouteSegment, Stop } from '@/types';
 
 const RouteMapInner = dynamic(() => import('./RouteMapInner'), { ssr: false });
 
 interface Props {
-  route: Coordinate[];
+  routes: RouteSegment[];
   stops?: Stop[];
   height?: number;
 }
 
-export default function RouteMap({ route, stops = [], height = 260 }: Props) {
-  if (route.length === 0) {
+export default function RouteMap({ routes, stops = [], height = 260 }: Props) {
+  const hasCoords = routes.some((s) => s.coordinates.length > 0);
+  if (!hasCoords) {
     return (
       <div
         className="rounded-2xl bg-gray-100 flex items-center justify-center border border-gray-200"
@@ -28,7 +29,7 @@ export default function RouteMap({ route, stops = [], height = 260 }: Props) {
 
   return (
     <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height }}>
-      <RouteMapInner route={route} stops={stops} />
+      <RouteMapInner routes={routes} stops={stops} />
     </div>
   );
 }

@@ -1,6 +1,27 @@
 import { openDB, IDBPDatabase } from 'idb';
 import { Hike, Companion, GearItem, Stop } from '@/types';
 
+// Migrate hikes from old schema (route: Coordinate[]) to new (routes: RouteSegment[])
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function migrateHike(raw: any): Hike {
+  const h = raw as Hike & { route?: unknown[] };
+  if (!h.routes || h.routes.length === 0) {
+    const legacyRoute = h.route;
+    if (Array.isArray(legacyRoute) && legacyRoute.length > 0) {
+      h.routes = [{ id: 'main', name: 'Tracé principal', coordinates: legacyRoute as Hike['routes'][0]['coordinates'] }];
+    } else {
+      h.routes = [];
+    }
+  }
+  if (!h.savedPois) h.savedPois = [];
+  if (!h.tags) h.tags = [];
+  h.gear = (h.gear || []).map((g: Hike['gear'][0] & { quantity?: number }) => ({
+    ...g,
+    quantity: g.quantity ?? 1,
+  }));
+  return h as Hike;
+}
+
 const DB_NAME = 'trailbook-db';
 const DB_VERSION = 1;
 
@@ -33,12 +54,14 @@ export async function getDb(): Promise<IDBPDatabase> {
 // Hikes
 export async function getAllHikes(): Promise<Hike[]> {
   const db = await getDb();
-  return db.getAll('hikes');
+  const raw = await db.getAll('hikes');
+  return raw.map(migrateHike);
 }
 
 export async function getHike(id: string): Promise<Hike | undefined> {
   const db = await getDb();
-  return db.get('hikes', id);
+  const raw = await db.get('hikes', id);
+  return raw ? migrateHike(raw) : undefined;
 }
 
 export async function saveHike(hike: Hike): Promise<void> {

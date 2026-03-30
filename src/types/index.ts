@@ -29,6 +29,21 @@ export interface GearItem {
 export interface HikeGearItem {
   gearId: string;
   packed: boolean;
+  quantity: number;
+}
+
+export interface RouteSegment {
+  id: string;
+  name: string;
+  coordinates: Coordinate[];
+}
+
+export interface SavedPOI {
+  id: string;
+  name: string;
+  type: string;
+  lat: number;
+  lng: number;
 }
 
 export interface Stop {
@@ -55,13 +70,13 @@ export interface Hike {
   description?: string;
   status: HikeStatus;
   date?: string;
+  dateEnd?: string;
   duration?: number;
   distance?: number;
   elevation?: number;
   difficulty?: Difficulty;
   photos: string[];
   companionIds: string[];
-  route: Coordinate[];
   comments?: string;
   rating?: number;
   region?: string;
@@ -69,5 +84,7 @@ export interface Hike {
   departureLocation?: NamedLocation;
   arrivalLocation?: NamedLocation;
   tags: string[];
+  routes: RouteSegment[];
+  savedPois: SavedPOI[];
   createdAt: string;
 }

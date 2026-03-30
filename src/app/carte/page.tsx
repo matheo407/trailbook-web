@@ -14,7 +14,7 @@ export default function CartePage() {
       <div className="bg-white border-b border-gray-100 px-4 py-3 pt-12 flex-shrink-0 z-10">
         <h1 className="text-lg font-bold text-gray-900">Carte</h1>
         <p className="text-xs text-gray-500">
-          {hikes.filter((h) => h.route.length > 0).length} randonnée{hikes.filter((h) => h.route.length > 0).length !== 1 ? 's' : ''} tracée{hikes.filter((h) => h.route.length > 0).length !== 1 ? 's' : ''}
+          {hikes.filter((h) => h.routes?.some((s) => s.coordinates.length > 0)).length} randonnée{hikes.filter((h) => h.routes?.some((s) => s.coordinates.length > 0)).length !== 1 ? 's' : ''} tracée{hikes.filter((h) => h.routes?.some((s) => s.coordinates.length > 0)).length !== 1 ? 's' : ''}
         </p>
       </div>
 

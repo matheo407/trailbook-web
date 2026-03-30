@@ -8,10 +8,11 @@ import { useCompanions } from '@/hooks/useCompanions';
 import CompanionSelector from '@/components/CompanionSelector';
 import PhotoUpload from '@/components/PhotoUpload';
 import RatingStars from '@/components/RatingStars';
-import RouteDrawer from '@/components/RouteDrawer';
+import MultiRouteDrawer from '@/components/MultiRouteDrawer';
 import PlaceSearch, { PlaceResult } from '@/components/PlaceSearch';
 import TagInput from '@/components/TagInput';
-import { Coordinate, Difficulty, HikeStatus, NamedLocation } from '@/types';
+import { RouteSegment, Difficulty, HikeStatus, NamedLocation } from '@/types';
+import { genId } from '@/lib/utils';
 import { ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,11 +41,12 @@ export default function NewHikePage() {
   const [rating, setRating] = useState(0);
   const [companionIds, setCompanionIds] = useState<string[]>([]);
   const [photos, setPhotos] = useState<string[]>([]);
-  const [route, setRoute] = useState<Coordinate[]>([]);
+  const [routes, setRoutes] = useState<RouteSegment[]>([{ id: genId(), name: 'Tracé principal', coordinates: [] }]);
   const [comments, setComments] = useState('');
   const [departureLocation, setDepartureLocation] = useState<NamedLocation | undefined>();
   const [arrivalLocation, setArrivalLocation] = useState<NamedLocation | undefined>();
   const [tags, setTags] = useState<string[]>([]);
+  const [dateEnd, setDateEnd] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +60,7 @@ export default function NewHikePage() {
         name: name.trim(),
         status,
         date: date || undefined,
+        dateEnd: dateEnd || undefined,
         distance: distance ? parseFloat(distance) : undefined,
         elevation: elevation ? parseInt(elevation) : undefined,
         duration,
@@ -67,12 +70,13 @@ export default function NewHikePage() {
         rating: status === 'faite' && rating > 0 ? rating : undefined,
         companionIds,
         photos,
-        route,
+        routes: routes.filter((s) => s.coordinates.length > 0),
         comments: comments.trim() || undefined,
         gear: [],
         departureLocation,
         arrivalLocation,
         tags,
+        savedPois: [],
       });
       router.push(`/randos/${hike.id}`);
     } finally {
@@ -117,10 +121,18 @@ export default function NewHikePage() {
         </div>
 
         {/* Date */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Date</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-            className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F]" />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Date de départ</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+              className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F]" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Date de fin</label>
+            <input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)}
+              min={date || undefined}
+              className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2D6A4F]/30 focus:border-[#2D6A4F]" />
+          </div>
         </div>
 
         {/* Distance & Dénivelé */}
@@ -239,10 +251,10 @@ export default function NewHikePage() {
           <TagInput tags={tags} onChange={setTags} />
         </div>
 
-        {/* Route */}
+        {/* Routes */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tracé sur la carte</label>
-          <RouteDrawer route={route} onChange={setRoute} hikeName={name || 'tracé'} />
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tracés sur la carte</label>
+          <MultiRouteDrawer routes={routes} onChange={setRoutes} hikeName={name || 'tracé'} />
         </div>
 
         {/* Comments */}

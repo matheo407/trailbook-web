@@ -102,6 +102,8 @@ export default function HikeDetailPage() {
       arrivalLocation: hike.arrivalLocation ? { name: hike.arrivalLocation.name } : undefined,
       companionNames: hikeCompanions.map((c) => c.name),
       stops: stops.map((s) => ({ name: s.name, type: s.type, notes: s.notes, mealDetails: s.mealDetails, journal: s.journal })),
+      savedPois: hike.savedPois,
+      routeCount: hike.routes.filter((r) => r.coordinates.length > 0).length,
       sharedAt: new Date().toISOString(),
     };
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
@@ -206,7 +208,9 @@ export default function HikeDetailPage() {
                 <Calendar size={14} className="text-[#2D6A4F]" />
                 <div>
                   <p className="text-xs text-gray-400">Date</p>
-                  <p className="text-xs font-semibold text-gray-800">{formatDate(hike.date)}</p>
+                  <p className="text-xs font-semibold text-gray-800">
+                    {formatDate(hike.date)}{hike.dateEnd ? ` → ${formatDate(hike.dateEnd)}` : ''}
+                  </p>
                 </div>
               </div>
             )}
@@ -270,20 +274,22 @@ export default function HikeDetailPage() {
         )}
 
         {/* Route map */}
-        {hike.route.length > 0 && (
+        {hike.routes.some((s) => s.coordinates.length > 0) && (
           <section className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <Map size={16} className="text-[#2D6A4F]" />
-              <h2 className="font-semibold text-gray-900 text-sm">Tracé</h2>
+              <h2 className="font-semibold text-gray-900 text-sm">
+                Tracé{hike.routes.filter((s) => s.coordinates.length > 0).length > 1 ? 's' : ''}
+              </h2>
             </div>
-            <RouteMap route={hike.route} stops={stops} />
+            <RouteMap routes={hike.routes} stops={stops} />
           </section>
         )}
 
         {/* Elevation profile */}
-        {hike.route.some((c) => c.ele !== undefined) && (
+        {hike.routes.some((s) => s.coordinates.some((c) => c.ele !== undefined)) && (
           <section className="mb-4">
-            <ElevationProfile route={hike.route} />
+            <ElevationProfile routes={hike.routes} />
           </section>
         )}
 
@@ -359,6 +365,27 @@ export default function HikeDetailPage() {
               <h2 className="font-semibold text-gray-900 text-sm">Commentaires</h2>
             </div>
             <p className="text-sm text-gray-600 leading-relaxed">{hike.comments}</p>
+          </section>
+        )}
+
+        {/* Saved POIs */}
+        {hike.savedPois && hike.savedPois.length > 0 && (
+          <section className="bg-white rounded-2xl shadow-sm p-4 mb-4 border border-gray-50">
+            <div className="flex items-center gap-2 mb-3">
+              <MapPin size={16} className="text-[#2D6A4F]" />
+              <h2 className="font-semibold text-gray-900 text-sm">Points d&apos;intérêt enregistrés</h2>
+            </div>
+            <div className="space-y-2">
+              {hike.savedPois.map((poi) => (
+                <div key={poi.id} className="flex items-center gap-2 py-1.5">
+                  <span className="text-base">📍</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-800">{poi.name}</p>
+                    <p className="text-xs text-[#2D6A4F]">{poi.type}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 

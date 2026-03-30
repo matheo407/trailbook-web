@@ -35,7 +35,7 @@ export default function GearChecklist({ gearItems, hikeGear, onChange }: Props) 
     if (existing) {
       onChange(hikeGear.map((g) => g.gearId === gearId ? { ...g, packed: !g.packed } : g));
     } else {
-      onChange([...hikeGear, { gearId, packed: true }]);
+      onChange([...hikeGear, { gearId, packed: true, quantity: 1 }]);
     }
   };
 
