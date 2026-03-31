@@ -31,7 +31,7 @@ async function flushPending() {
   pendingWrites.clear();
 
   for (const [table, rows] of byTable.entries()) {
-    await supabase.from(table).upsert(rows).catch(() => {});
+    await supabase.from(table).upsert(rows);
   }
 }
 
