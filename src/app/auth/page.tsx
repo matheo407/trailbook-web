@@ -25,8 +25,11 @@ export default function AuthPage() {
     try {
       if (mode === 'login') {
         await signIn(email, password);
-        // Pull cloud data → overwrite local IndexedDB
-        await pullFromCloud();
+        // Pull cloud data with timeout — don't block login if it hangs
+        await Promise.race([
+          pullFromCloud(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+        ]).catch(() => {});
         router.push('/');
       } else {
         await signUp(email, password);
