@@ -24,7 +24,7 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Smooth scrolling */
+/* Smooth scrolling on iOS */
 * {
   -webkit-overflow-scrolling: touch;
 }
