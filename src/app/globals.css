@@ -12,11 +12,7 @@ html, body {
   height: 100%;
   background-color: #F8F9FA;
   -webkit-tap-highlight-color: transparent;
-}
-
-/* iOS PWA: font-size >= 16px prevents auto-zoom on focus */
-input, textarea, select {
-  font-size: 16px !important;
+  -webkit-touch-callout: none;
 }
 
 body {
