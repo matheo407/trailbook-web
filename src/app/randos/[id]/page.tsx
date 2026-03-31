@@ -30,8 +30,12 @@ import {
   Users,
   FileText,
   ClipboardList,
+  CheckCircle2,
+  Circle,
 } from 'lucide-react';
 import { Stop } from '@/types';
+import { saveHike } from '@/lib/db';
+import { pushRow } from '@/lib/sync';
 
 export default function HikeDetailPage() {
   const params = useParams();
@@ -118,6 +122,15 @@ export default function HikeDetailPage() {
     setTimeout(() => setShareCopied(false), 3000);
   };
 
+  const handleToggleStatus = async () => {
+    if (!hike) return;
+    const newStatus = hike.status === 'faite' ? 'planifiée' : 'faite';
+    const updated = { ...hike, status: newStatus } as typeof hike;
+    setHike(updated);
+    await saveHike(updated);
+    pushRow('hikes', updated as unknown as Record<string, unknown>).catch(() => {});
+  };
+
   const handleExport = () => {
     if (!hike) return;
     const markdown = generateHikeMarkdown(hike, stops, companions, gearItems);
@@ -171,7 +184,18 @@ export default function HikeDetailPage() {
         <div className="bg-white rounded-2xl shadow-sm p-4 mb-4 border border-gray-50">
           <div className="flex items-start justify-between gap-2 mb-2">
             <h1 className="text-xl font-bold text-gray-900 flex-1">{hike.name}</h1>
-            <StatusBadge status={hike.status} />
+            <button
+              onClick={handleToggleStatus}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors active:scale-95 ${
+                hike.status === 'faite'
+                  ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]'
+                  : 'bg-white text-gray-600 border-gray-300'
+              }`}
+            >
+              {hike.status === 'faite'
+                ? <><CheckCircle2 size={13} /> Faite</>
+                : <><Circle size={13} /> Planifiée</>}
+            </button>
           </div>
 
           {hike.region && (
