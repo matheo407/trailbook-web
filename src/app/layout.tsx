@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import BottomNav from '@/components/BottomNav';
+import IOSInputFix from '@/components/IOSInputFix';
 
 export const metadata: Metadata = {
   title: 'TrailBook',
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body>
+        <IOSInputFix />
         <main className="pb-20 min-h-screen">
           {children}
         </main>
