@@ -24,17 +24,19 @@ export default function AuthPage() {
     setSuccess('');
     try {
       if (mode === 'login') {
-        await signIn(email, password);
-        // Pull cloud data with timeout — don't block login if it hangs
         await Promise.race([
-          pullFromCloud(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
-        ]).catch(() => {});
+          signIn(email, password),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Connexion trop lente, réessaie.')), 20000)),
+        ]);
         router.push('/');
+        // Pull in background after redirect
+        pullFromCloud().catch(() => {});
       } else {
-        await signUp(email, password);
-        // Push existing local data to new account
-        await pushToCloud();
+        await Promise.race([
+          signUp(email, password),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Connexion trop lente, réessaie.')), 20000)),
+        ]);
+        pushToCloud().catch(() => {});
         setSuccess('Compte créé ! Vérifie tes emails pour confirmer, puis connecte-toi.');
         setMode('login');
       }
