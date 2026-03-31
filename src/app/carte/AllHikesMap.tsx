@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer } from 'react-leaflet';
+import { useEffect } from 'react';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useRouter } from 'next/navigation';
 import { Hike } from '@/types';
 
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
@@ -14,83 +13,75 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-export default function AllHikesMap({ hikes }: { hikes: Hike[] }) {
-  const mapRef = useRef<L.Map | null>(null);
-  const layersRef = useRef<(L.Polyline | L.Marker)[]>([]);
-  const router = useRouter();
-
+function BoundsFitter({ hikes }: { hikes: Hike[] }) {
+  const map = useMap();
   useEffect(() => {
-    layersRef.current.forEach((l) => l.remove());
-    layersRef.current = [];
-    if (!mapRef.current) return;
-
     const allPoints: [number, number][] = [];
-
     hikes.forEach((hike) => {
-      const allCoords = hike.routes?.flatMap((s) => s.coordinates) ?? [];
-      if (allCoords.length < 2 || !mapRef.current) return;
-
-      const positions = allCoords.map((c: { lat: number; lng: number }) => [c.lat, c.lng] as [number, number]);
-      const color = hike.status === 'faite' ? '#2D6A4F' : '#74C0FC';
-
-      const polyline = L.polyline(positions, {
-        color,
-        weight: 4,
-        opacity: 0.85,
-      });
-      polyline.bindPopup(
-        `<div style="min-width:120px">
-          <b style="font-size:14px">${hike.name}</b>
-          <br/>
-          <span style="color:${color};font-size:12px">${hike.status === 'faite' ? '✓ Faite' : '📅 Planifiée'}</span>
-          ${hike.distance ? `<br/><span style="font-size:12px;color:#666">${hike.distance} km</span>` : ''}
-          <br/>
-          <a href="/randos/${hike.id}" style="font-size:12px;color:#2D6A4F;font-weight:600;text-decoration:none">Voir les détails →</a>
-        </div>`
-      );
-      polyline.addTo(mapRef.current);
-      layersRef.current.push(polyline);
-
-      // Start marker
-      const startIcon = L.divIcon({
-        className: '',
-        html: `<div style="width:10px;height:10px;background:${color};border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
-        iconSize: [10, 10],
-        iconAnchor: [5, 5],
-      });
-      const startMarker = L.marker(positions[0], { icon: startIcon });
-      startMarker.bindPopup(
-        `<div>
-          <b style="font-size:13px">${hike.name}</b>
-          <br/>
-          <a href="/randos/${hike.id}" style="font-size:12px;color:#2D6A4F;font-weight:600">Voir →</a>
-        </div>`
-      );
-      startMarker.addTo(mapRef.current);
-      layersRef.current.push(startMarker);
-
-      positions.forEach((p: [number, number]) => allPoints.push(p));
+      const coords = hike.routes?.flatMap((s) => s.coordinates) ?? [];
+      coords.forEach((c) => allPoints.push([c.lat, c.lng]));
     });
-
-    // Fit bounds if routes exist
-    if (allPoints.length > 0 && mapRef.current) {
-      const bounds = L.latLngBounds(allPoints);
-      mapRef.current.fitBounds(bounds, { padding: [30, 30] });
+    if (allPoints.length > 0) {
+      map.fitBounds(L.latLngBounds(allPoints), { padding: [30, 30] });
     }
-  }, [hikes]);
+  }, [hikes, map]);
+  return null;
+}
 
+export default function AllHikesMap({ hikes }: { hikes: Hike[] }) {
   return (
     <MapContainer
       center={[46.2276, 2.2137]}
       zoom={6}
       style={{ width: '100%', height: '100%' }}
-      ref={mapRef}
       scrollWheelZoom
     >
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
       />
+      <BoundsFitter hikes={hikes} />
+      {hikes.flatMap((hike) => {
+        const allCoords = hike.routes?.flatMap((s) => s.coordinates) ?? [];
+        if (allCoords.length < 2) return [];
+        const positions = allCoords.map((c) => [c.lat, c.lng] as [number, number]);
+        const color = hike.status === 'faite' ? '#2D6A4F' : '#74C0FC';
+        const startIcon = L.divIcon({
+          className: '',
+          html: `<div style="width:10px;height:10px;background:${color};border:2px solid white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
+          iconSize: [10, 10],
+          iconAnchor: [5, 5],
+        });
+        return [
+          <Polyline
+            key={`poly-${hike.id}`}
+            positions={positions}
+            pathOptions={{ color, weight: 4, opacity: 0.85 }}
+          >
+            <Popup>
+              <div style={{ minWidth: 120 }}>
+                <b style={{ fontSize: 14 }}>{hike.name}</b>
+                <br />
+                <span style={{ color, fontSize: 12 }}>{hike.status === 'faite' ? '✓ Faite' : '📅 Planifiée'}</span>
+                {hike.distance && <><br /><span style={{ fontSize: 12, color: '#666' }}>{hike.distance} km</span></>}
+                <br />
+                <a href={`/randos/${hike.id}`} style={{ fontSize: 12, color: '#2D6A4F', fontWeight: 600, textDecoration: 'none' }}>
+                  Voir les détails →
+                </a>
+              </div>
+            </Popup>
+          </Polyline>,
+          <Marker key={`marker-${hike.id}`} position={positions[0]} icon={startIcon}>
+            <Popup>
+              <div>
+                <b style={{ fontSize: 13 }}>{hike.name}</b>
+                <br />
+                <a href={`/randos/${hike.id}`} style={{ fontSize: 12, color: '#2D6A4F', fontWeight: 600 }}>Voir →</a>
+              </div>
+            </Popup>
+          </Marker>,
+        ];
+      })}
     </MapContainer>
   );
 }

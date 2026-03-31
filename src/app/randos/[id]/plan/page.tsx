@@ -1,21 +1,24 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ChevronLeft, Plus, Trash2, ChevronUp, ChevronDown,
-  Download, UtensilsCrossed, Coffee, Tent, Eye, MapPin, Check
+  Download, UtensilsCrossed, Coffee, Tent, Eye, MapPin, Check, Map, X
 } from 'lucide-react';
 import { useHikes } from '@/hooks/useHikes';
 import { useStops } from '@/hooks/useStops';
 import { useGear } from '@/hooks/useGear';
 import { useCompanions } from '@/hooks/useCompanions';
 import RouteMap from '@/components/RouteMap';
-import { Hike, Stop, StopType, GearItem } from '@/types';
+import { Coordinate, Hike, Stop, StopType, GearItem, RouteSegment } from '@/types';
 import { genId, formatDuration } from '@/lib/utils';
 import { saveStop } from '@/lib/db';
 import { generateHikeMarkdown } from '@/lib/markdown';
+
+const StopMapPicker = dynamic(() => import('@/components/StopMapPickerInner'), { ssr: false });
 
 const stopTypeConfig: Record<StopType, { label: string; icon: React.ReactNode; color: string }> = {
   repas:       { label: 'Repas',        icon: <UtensilsCrossed size={16} />, color: '#F4A261' },
@@ -41,9 +44,10 @@ interface StopFormData {
   notes: string;
   mealDetails: string;
   journal: string;
+  coordinate?: Coordinate;
 }
 
-const defaultForm: StopFormData = { name: '', type: 'repos', notes: '', mealDetails: '', journal: '' };
+const defaultForm: StopFormData = { name: '', type: 'repos', notes: '', mealDetails: '', journal: '', coordinate: undefined };
 
 export default function PlanPage() {
   const { id } = useParams<{ id: string }>();
@@ -79,6 +83,7 @@ export default function PlanPage() {
         notes: form.notes.trim() || undefined,
         mealDetails: form.type === 'repas' && form.mealDetails.trim() ? form.mealDetails.trim() : undefined,
         journal: form.journal.trim() || undefined,
+        coordinate: form.coordinate,
       });
       setForm(defaultForm);
       setAddingStop(false);
@@ -97,6 +102,7 @@ export default function PlanPage() {
         notes: form.notes.trim() || undefined,
         mealDetails: form.type === 'repas' && form.mealDetails.trim() ? form.mealDetails.trim() : undefined,
         journal: form.journal.trim() || undefined,
+        coordinate: form.coordinate,
       });
       setEditingStopId(null);
       setForm(defaultForm);
@@ -113,6 +119,7 @@ export default function PlanPage() {
       notes: stop.notes || '',
       mealDetails: stop.mealDetails || '',
       journal: stop.journal || '',
+      coordinate: stop.coordinate,
     });
     setAddingStop(false);
   };
@@ -258,6 +265,7 @@ export default function PlanPage() {
                     onCancel={() => { setEditingStopId(null); setForm(defaultForm); }}
                     saving={saving}
                     label="Modifier l'étape"
+                    routes={hike.routes}
                   />
                 ) : (
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
@@ -279,6 +287,12 @@ export default function PlanPage() {
                           </span>
                         </div>
                         <p className="font-semibold text-gray-900 mt-0.5">{stop.name}</p>
+                        {stop.coordinate && (
+                          <p className="text-xs text-[#2D6A4F] mt-0.5 flex items-center gap-1">
+                            <MapPin size={11} />
+                            {stop.coordinate.lat.toFixed(5)}, {stop.coordinate.lng.toFixed(5)}
+                          </p>
+                        )}
                         {stop.notes && <p className="text-sm text-gray-500 mt-0.5">{stop.notes}</p>}
                         {stop.mealDetails && (
                           <div className="mt-1.5 bg-orange-50 rounded-xl px-2.5 py-1.5">
@@ -332,6 +346,7 @@ export default function PlanPage() {
               onCancel={() => { setAddingStop(false); setForm(defaultForm); }}
               saving={saving}
               label="Ajouter l'étape"
+              routes={hike.routes}
             />
           )}
 
@@ -440,14 +455,18 @@ function StopForm({
   onCancel,
   saving,
   label,
+  routes,
 }: {
-  form: { name: string; type: StopType; notes: string; mealDetails: string; journal: string };
+  form: StopFormData;
   setForm: (f: any) => void;
   onSave: () => void;
   onCancel: () => void;
   saving: boolean;
   label: string;
+  routes: RouteSegment[];
 }) {
+  const [showMap, setShowMap] = useState(false);
+
   return (
     <div className="bg-white rounded-2xl border border-[#52B788] shadow-sm p-4 space-y-3">
       {/* Type selector */}
@@ -501,6 +520,48 @@ function StopForm({
         value={form.journal}
         onChange={(e) => setForm((f: any) => ({ ...f, journal: e.target.value }))}
       />
+
+      {/* Map coordinate picker */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowMap((v) => !v)}
+          className={`flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-xl border transition-colors ${
+            form.coordinate
+              ? 'bg-[#2D6A4F]/10 text-[#2D6A4F] border-[#2D6A4F]/30'
+              : 'bg-gray-50 text-gray-600 border-gray-200'
+          }`}
+        >
+          <Map size={13} />
+          {form.coordinate
+            ? `📍 ${form.coordinate.lat.toFixed(4)}, ${form.coordinate.lng.toFixed(4)}`
+            : 'Placer sur la carte'}
+        </button>
+        {form.coordinate && (
+          <button
+            type="button"
+            onClick={() => setForm((f: any) => ({ ...f, coordinate: undefined }))}
+            className="ml-2 text-xs text-red-400 underline"
+          >
+            Supprimer
+          </button>
+        )}
+        {showMap && (
+          <div className="mt-2 rounded-2xl overflow-hidden border border-gray-200" style={{ height: 220 }}>
+            <StopMapPicker
+              routes={routes}
+              coordinate={form.coordinate}
+              onPick={(coord) => {
+                setForm((f: any) => ({ ...f, coordinate: coord }));
+                setShowMap(false);
+              }}
+            />
+          </div>
+        )}
+        {showMap && (
+          <p className="text-xs text-gray-400 mt-1.5 text-center">Appuie sur la carte pour placer l&apos;étape</p>
+        )}
+      </div>
 
       <div className="flex gap-2">
         <button
