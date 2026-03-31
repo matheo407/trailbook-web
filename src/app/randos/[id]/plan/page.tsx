@@ -60,9 +60,8 @@ export default function PlanPage() {
   const [hike, setHike] = useState<Hike | null>(null);
   const [addingStop, setAddingStop] = useState(false);
   const [editingStopId, setEditingStopId] = useState<string | null>(null);
-  const [form, setForm] = useState<StopFormData>(defaultForm);
+  const [editingStopData, setEditingStopData] = useState<StopFormData>(defaultForm);
   const [activeTab, setActiveTab] = useState<'etapes' | 'materiel'>('etapes');
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && id) {
@@ -73,47 +72,32 @@ export default function PlanPage() {
     }
   }, [id, getHike, router]);
 
-  const handleAddStop = async () => {
-    if (!form.name.trim()) return;
-    setSaving(true);
-    try {
-      await createStop({
-        name: form.name.trim(),
-        type: form.type,
-        notes: form.notes.trim() || undefined,
-        mealDetails: form.type === 'repas' && form.mealDetails.trim() ? form.mealDetails.trim() : undefined,
-        journal: form.journal.trim() || undefined,
-        coordinate: form.coordinate,
-      });
-      setForm(defaultForm);
-      setAddingStop(false);
-    } finally {
-      setSaving(false);
-    }
+  const handleAddStop = async (data: StopFormData) => {
+    await createStop({
+      name: data.name.trim(),
+      type: data.type,
+      notes: data.notes.trim() || undefined,
+      mealDetails: data.type === 'repas' && data.mealDetails.trim() ? data.mealDetails.trim() : undefined,
+      journal: data.journal.trim() || undefined,
+      coordinate: data.coordinate,
+    });
+    setAddingStop(false);
   };
 
-  const handleEditStop = async (stopId: string) => {
-    if (!form.name.trim()) return;
-    setSaving(true);
-    try {
-      await updateStop(stopId, {
-        name: form.name.trim(),
-        type: form.type,
-        notes: form.notes.trim() || undefined,
-        mealDetails: form.type === 'repas' && form.mealDetails.trim() ? form.mealDetails.trim() : undefined,
-        journal: form.journal.trim() || undefined,
-        coordinate: form.coordinate,
-      });
-      setEditingStopId(null);
-      setForm(defaultForm);
-    } finally {
-      setSaving(false);
-    }
+  const handleEditStop = async (stopId: string, data: StopFormData) => {
+    await updateStop(stopId, {
+      name: data.name.trim(),
+      type: data.type,
+      notes: data.notes.trim() || undefined,
+      mealDetails: data.type === 'repas' && data.mealDetails.trim() ? data.mealDetails.trim() : undefined,
+      journal: data.journal.trim() || undefined,
+      coordinate: data.coordinate,
+    });
+    setEditingStopId(null);
   };
 
   const startEdit = (stop: Stop) => {
-    setEditingStopId(stop.id);
-    setForm({
+    setEditingStopData({
       name: stop.name,
       type: stop.type,
       notes: stop.notes || '',
@@ -121,6 +105,7 @@ export default function PlanPage() {
       journal: stop.journal || '',
       coordinate: stop.coordinate,
     });
+    setEditingStopId(stop.id);
     setAddingStop(false);
   };
 
@@ -259,11 +244,9 @@ export default function PlanPage() {
               <div key={stop.id}>
                 {editingStopId === stop.id ? (
                   <StopForm
-                    form={form}
-                    setForm={setForm}
-                    onSave={() => handleEditStop(stop.id)}
-                    onCancel={() => { setEditingStopId(null); setForm(defaultForm); }}
-                    saving={saving}
+                    initialData={editingStopData}
+                    onSave={(data) => handleEditStop(stop.id, data)}
+                    onCancel={() => setEditingStopId(null)}
                     label="Modifier l'étape"
                     routes={hike.routes}
                   />
@@ -340,11 +323,9 @@ export default function PlanPage() {
 
           {addingStop && (
             <StopForm
-              form={form}
-              setForm={setForm}
+              initialData={defaultForm}
               onSave={handleAddStop}
-              onCancel={() => { setAddingStop(false); setForm(defaultForm); }}
-              saving={saving}
+              onCancel={() => setAddingStop(false)}
               label="Ajouter l'étape"
               routes={hike.routes}
             />
@@ -352,7 +333,7 @@ export default function PlanPage() {
 
           {!addingStop && editingStopId === null && (
             <button
-              onClick={() => { setAddingStop(true); setForm(defaultForm); }}
+              onClick={() => setAddingStop(true)}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-[#52B788] text-[#2D6A4F] font-medium text-sm"
             >
               <Plus size={18} />
@@ -480,23 +461,31 @@ export default function PlanPage() {
 }
 
 function StopForm({
-  form,
-  setForm,
+  initialData,
   onSave,
   onCancel,
-  saving,
   label,
   routes,
 }: {
-  form: StopFormData;
-  setForm: (f: any) => void;
-  onSave: () => void;
+  initialData: StopFormData;
+  onSave: (data: StopFormData) => Promise<void>;
   onCancel: () => void;
-  saving: boolean;
   label: string;
   routes: RouteSegment[];
 }) {
+  const [form, setForm] = useState<StopFormData>(initialData);
+  const [saving, setSaving] = useState(false);
   const [showMap, setShowMap] = useState(false);
+
+  const handleSave = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      await onSave(form);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-[#52B788] shadow-sm p-4 space-y-3">
@@ -506,7 +495,7 @@ function StopForm({
           <button
             key={t}
             type="button"
-            onClick={() => setForm((f: any) => ({ ...f, type: t }))}
+            onClick={() => setForm((f) => ({ ...f, type: t }))}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
               form.type === t
                 ? 'text-white border-transparent'
@@ -521,35 +510,35 @@ function StopForm({
       </div>
 
       <input
-        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F]"
+        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#2D6A4F]"
         placeholder="Nom de l'étape *"
         value={form.name}
-        onChange={(e) => setForm((f: any) => ({ ...f, name: e.target.value }))}
+        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
       />
 
       {form.type === 'repas' && (
         <textarea
-          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F] resize-none"
+          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#2D6A4F] resize-none"
           placeholder="Menu / repas prévu..."
           rows={2}
           value={form.mealDetails}
-          onChange={(e) => setForm((f: any) => ({ ...f, mealDetails: e.target.value }))}
+          onChange={(e) => setForm((f) => ({ ...f, mealDetails: e.target.value }))}
         />
       )}
 
       <input
-        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F]"
+        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#2D6A4F]"
         placeholder="Notes (optionnel)"
         value={form.notes}
-        onChange={(e) => setForm((f: any) => ({ ...f, notes: e.target.value }))}
+        onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
       />
 
       <textarea
-        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F] resize-none"
+        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#2D6A4F] resize-none"
         placeholder="📓 Journal — raconte cette étape librement..."
         rows={3}
         value={form.journal}
-        onChange={(e) => setForm((f: any) => ({ ...f, journal: e.target.value }))}
+        onChange={(e) => setForm((f) => ({ ...f, journal: e.target.value }))}
       />
 
       {/* Map coordinate picker */}
@@ -571,7 +560,7 @@ function StopForm({
         {form.coordinate && (
           <button
             type="button"
-            onClick={() => setForm((f: any) => ({ ...f, coordinate: undefined }))}
+            onClick={() => setForm((f) => ({ ...f, coordinate: undefined }))}
             className="ml-2 text-xs text-red-400 underline"
           >
             Supprimer
@@ -583,7 +572,7 @@ function StopForm({
               routes={routes}
               coordinate={form.coordinate}
               onPick={(coord) => {
-                setForm((f: any) => ({ ...f, coordinate: coord }));
+                setForm((f) => ({ ...f, coordinate: coord }));
                 setShowMap(false);
               }}
             />
@@ -602,7 +591,7 @@ function StopForm({
           Annuler
         </button>
         <button
-          onClick={onSave}
+          onClick={handleSave}
           disabled={!form.name.trim() || saving}
           className="flex-1 py-2.5 text-sm text-white bg-[#2D6A4F] rounded-xl font-medium disabled:opacity-50"
         >
