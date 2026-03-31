@@ -399,42 +399,73 @@ export default function PlanPage() {
             </div>
           ) : (
             Object.entries(groupedGear).map(([category, items]) => (
-              <div key={category} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                    {gearCategoryLabel[category] || category}
-                  </p>
-                </div>
-                <div className="divide-y divide-gray-50">
+              <div key={category}>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">
+                  {gearCategoryLabel[category] || category}
+                </p>
+                <div className="grid grid-cols-3 gap-2.5">
                   {items.map((item) => {
                     const hikeGear = hike.gear.find((g) => g.gearId === item.id);
                     const isPacked = hikeGear?.packed ?? false;
                     const qty = hikeGear?.quantity ?? 1;
                     return (
-                      <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+                      <div
+                        key={item.id}
+                        className={`relative rounded-2xl overflow-hidden border-2 transition-all ${
+                          isPacked ? 'border-[#2D6A4F] shadow-md' : 'border-gray-100 bg-white'
+                        }`}
+                      >
+                        {/* Photo or placeholder */}
                         <button
                           onClick={() => toggleGear(item.id)}
-                          className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                            isPacked ? 'bg-[#2D6A4F] border-[#2D6A4F]' : 'border-gray-300'
-                          }`}
+                          className="w-full aspect-square relative block"
                         >
-                          {isPacked && <Check size={14} strokeWidth={3} className="text-white" />}
+                          {item.photo ? (
+                            <img
+                              src={item.photo}
+                              alt={item.name}
+                              className={`w-full h-full object-cover transition-opacity ${isPacked ? 'opacity-100' : 'opacity-60'}`}
+                            />
+                          ) : (
+                            <div className={`w-full h-full flex items-center justify-center text-3xl ${isPacked ? 'bg-[#2D6A4F]/10' : 'bg-gray-50'}`}>
+                              📦
+                            </div>
+                          )}
+                          {/* Check overlay */}
+                          {isPacked && (
+                            <div className="absolute top-1.5 right-1.5 w-6 h-6 bg-[#2D6A4F] rounded-full flex items-center justify-center shadow">
+                              <Check size={13} strokeWidth={3} className="text-white" />
+                            </div>
+                          )}
                         </button>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium ${isPacked ? 'text-gray-900' : 'text-gray-500'}`}>{item.name}</p>
+
+                        {/* Name + weight + qty */}
+                        <div className={`px-2 pt-1.5 pb-2 ${isPacked ? 'bg-[#2D6A4F]/5' : 'bg-white'}`}>
+                          <p className={`text-xs font-semibold leading-tight truncate ${isPacked ? 'text-[#2D6A4F]' : 'text-gray-600'}`}>
+                            {item.name}
+                          </p>
                           {item.weight && (
-                            <p className="text-xs text-gray-400">{item.weight * qty}g {qty > 1 ? `(${qty}×${item.weight}g)` : ''}</p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">
+                              {item.weight * qty}g{qty > 1 ? ` ×${qty}` : ''}
+                            </p>
+                          )}
+                          {isPacked && (
+                            <div className="flex items-center gap-1 mt-1.5 bg-white rounded-lg px-1 py-0.5 w-fit">
+                              <button
+                                type="button"
+                                onClick={() => setGearQuantity(item.id, qty - 1)}
+                                disabled={qty <= 1}
+                                className="w-5 h-5 flex items-center justify-center text-gray-600 disabled:opacity-30 font-bold text-sm"
+                              >−</button>
+                              <span className="text-xs font-bold text-gray-800 min-w-[14px] text-center">{qty}</span>
+                              <button
+                                type="button"
+                                onClick={() => setGearQuantity(item.id, qty + 1)}
+                                className="w-5 h-5 flex items-center justify-center text-gray-600 font-bold text-sm"
+                              >+</button>
+                            </div>
                           )}
                         </div>
-                        {isPacked && (
-                          <div className="flex items-center gap-1 bg-gray-100 rounded-xl px-1.5 py-0.5">
-                            <button type="button" onClick={() => setGearQuantity(item.id, qty - 1)} disabled={qty <= 1}
-                              className="w-6 h-6 flex items-center justify-center text-gray-600 disabled:opacity-30 text-base font-bold">−</button>
-                            <span className="text-xs font-semibold text-gray-800 min-w-[16px] text-center">{qty}</span>
-                            <button type="button" onClick={() => setGearQuantity(item.id, qty + 1)}
-                              className="w-6 h-6 flex items-center justify-center text-gray-600 text-base font-bold">+</button>
-                          </div>
-                        )}
                       </div>
                     );
                   })}
