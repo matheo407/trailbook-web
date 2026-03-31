@@ -16,6 +16,8 @@ const tabs = [
 export default function BottomNav() {
   const pathname = usePathname();
 
+  if (pathname === '/auth') return null;
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 shadow-lg">
       <div className="flex items-center justify-around pb-safe" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}>

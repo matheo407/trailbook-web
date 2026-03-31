@@ -15,9 +15,12 @@ html, body {
 }
 
 /* Prevent iOS from zooming inputs (< 16px blocks keyboard in PWA).
-   !important overrides Tailwind text-sm/text-xs on input elements. */
-input, textarea, select {
+   !important overrides Tailwind text-sm/text-xs on input elements.
+   touch-action: manipulation removes 300ms tap delay and fixes
+   "not clickable" inputs in iOS PWA standalone mode. */
+input, textarea, select, button, a {
   font-size: 16px !important;
+  touch-action: manipulation;
 }
 
 body {
