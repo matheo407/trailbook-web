@@ -12,7 +12,11 @@ html, body {
   height: 100%;
   background-color: #F8F9FA;
   -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
+}
+
+/* Prevent iOS from trying to zoom inputs (which blocks keyboard in PWA) */
+input, textarea, select {
+  font-size: 16px;
 }
 
 body {
