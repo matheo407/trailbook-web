@@ -9,20 +9,51 @@ import { Hike, Companion, GearItem, Stop } from '@/types';
 
 type Table = 'hikes' | 'companions' | 'gear_items' | 'stops';
 
-// --- Write-through helpers (fire-and-forget) ---
+// Debounce buffer: accumulate writes and flush after 3s of inactivity
+const pendingWrites = new Map<string, { table: Table; obj: Record<string, unknown> }>();
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
-export async function pushRow(table: Table, obj: Record<string, unknown>): Promise<void> {
+async function flushPending() {
+  if (pendingWrites.size === 0) return;
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  await supabase.from(table).upsert({
-    id: obj.id as string,
-    user_id: user.id,
-    data: obj,
-    updated_at: new Date().toISOString(),
-  });
+  if (!user) { pendingWrites.clear(); return; }
+
+  const byTable = new Map<Table, Record<string, unknown>[]>();
+  for (const { table, obj } of pendingWrites.values()) {
+    if (!byTable.has(table)) byTable.set(table, []);
+    byTable.get(table)!.push({
+      id: obj.id as string,
+      user_id: user.id,
+      data: obj,
+      updated_at: new Date().toISOString(),
+    });
+  }
+  pendingWrites.clear();
+
+  for (const [table, rows] of byTable.entries()) {
+    await supabase.from(table).upsert(rows).catch(() => {});
+  }
+}
+
+// --- Write-through helpers (debounced) ---
+
+export function pushRow(table: Table, obj: Record<string, unknown>): Promise<void> {
+  const key = `${table}:${obj.id}`;
+  pendingWrites.set(key, { table, obj });
+
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    flushPending().catch(() => {});
+  }, 3000);
+
+  return Promise.resolve();
 }
 
 export async function deleteRow(table: Table, id: string): Promise<void> {
+  // Remove any pending write for this id
+  pendingWrites.delete(`${table}:${id}`);
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
   await supabase.from(table).delete().eq('id', id).eq('user_id', user.id);
