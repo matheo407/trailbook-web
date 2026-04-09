@@ -1,17 +1,36 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { formatDate, formatDuration } from '@/lib/utils';
 import DifficultyBadge from '@/components/DifficultyBadge';
 import RatingStars from '@/components/RatingStars';
-import { Calendar, Ruler, TrendingUp, Clock, MapPin, Mountain } from 'lucide-react';
-import { Difficulty, HikeStatus } from '@/types';
+import { Calendar, Ruler, TrendingUp, Clock, MapPin, Mountain, PlusCircle } from 'lucide-react';
+import { Difficulty, HikeStatus, StopType, Hike, Stop } from '@/types';
+import { decompressFromEncodedURIComponent } from 'lz-string';
+import { saveHike, saveStop } from '@/lib/db';
+import { pushRow } from '@/lib/sync';
+
+const ShareMap = dynamic(() => import('./ShareMap'), { ssr: false });
+
+interface SharedCoord { lat: number; lng: number; ele?: number }
+interface SharedRoute { name: string; coordinates: SharedCoord[] }
+interface SharedStop {
+  name: string;
+  type: StopType;
+  notes?: string;
+  coordinate?: SharedCoord;
+  mealDetails?: string;
+  journal?: string;
+}
+interface SharedPOI { id: string; name: string; type: string; lat: number; lng: number }
 
 interface SharedHike {
   name: string;
   status: HikeStatus;
   date?: string;
+  dateEnd?: string;
   distance?: number;
   elevation?: number;
   duration?: number;
@@ -24,31 +43,102 @@ interface SharedHike {
   departureLocation?: { name: string };
   arrivalLocation?: { name: string };
   companionNames?: string[];
-  stops?: { name: string; type: string; notes?: string; mealDetails?: string; journal?: string }[];
+  stops?: SharedStop[];
+  routes?: SharedRoute[];
+  savedPois?: SharedPOI[];
   sharedAt: string;
 }
 
-function decodeShare(encoded: string): SharedHike | null {
+function decode(encoded: string): SharedHike | null {
   try {
+    // Try lz-string first (new format)
+    const decompressed = decompressFromEncodedURIComponent(encoded);
+    if (decompressed) return JSON.parse(decompressed) as SharedHike;
+  } catch { /* fall through */ }
+  try {
+    // Fallback: old base64 format
     const json = decodeURIComponent(escape(atob(encoded)));
     return JSON.parse(json) as SharedHike;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 function ShareContent() {
   const params = useSearchParams();
+  const router = useRouter();
   const [hike, setHike] = useState<SharedHike | null>(null);
   const [error, setError] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState(false);
 
   useEffect(() => {
     const d = params.get('d');
     if (!d) { setError(true); return; }
-    const decoded = decodeShare(d);
+    const decoded = decode(d);
     if (!decoded) { setError(true); return; }
     setHike(decoded);
   }, [params]);
+
+  const handleImport = async () => {
+    if (!hike) return;
+    setImporting(true);
+    try {
+      const hikeId = crypto.randomUUID();
+      const newHike: Hike = {
+        id: hikeId,
+        name: hike.name,
+        status: hike.status,
+        date: hike.date,
+        dateEnd: hike.dateEnd,
+        distance: hike.distance,
+        elevation: hike.elevation,
+        duration: hike.duration,
+        difficulty: hike.difficulty,
+        region: hike.region,
+        description: hike.description,
+        rating: hike.rating,
+        comments: hike.comments,
+        tags: hike.tags ?? [],
+        departureLocation: hike.departureLocation as Hike['departureLocation'],
+        arrivalLocation: hike.arrivalLocation as Hike['arrivalLocation'],
+        photos: [],
+        companionIds: [],
+        gear: [],
+        routes: (hike.routes ?? []).map((r) => ({
+          id: crypto.randomUUID(),
+          name: r.name,
+          coordinates: r.coordinates,
+        })),
+        savedPois: hike.savedPois ?? [],
+        createdAt: new Date().toISOString(),
+      };
+      await saveHike(newHike);
+      pushRow('hikes', newHike as unknown as Record<string, unknown>).catch(() => {});
+
+      if (hike.stops) {
+        for (let i = 0; i < hike.stops.length; i++) {
+          const s = hike.stops[i];
+          const stop: Stop = {
+            id: crypto.randomUUID(),
+            hikeId,
+            name: s.name,
+            type: s.type,
+            notes: s.notes,
+            coordinate: s.coordinate,
+            mealDetails: s.mealDetails,
+            journal: s.journal,
+            order: i,
+          };
+          await saveStop(stop);
+          pushRow('stops', stop as unknown as Record<string, unknown>).catch(() => {});
+        }
+      }
+
+      setImported(true);
+      setTimeout(() => router.push(`/randos/${hikeId}`), 800);
+    } catch {
+      setImporting(false);
+    }
+  };
 
   if (error) {
     return (
@@ -68,15 +158,15 @@ function ShareContent() {
     );
   }
 
+  const hasRoutes = hike.routes && hike.routes.some((r) => r.coordinates.length > 0);
+
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
       {/* Header */}
       <div className="bg-gradient-to-br from-[#2D6A4F] to-[#52B788] px-4 pt-14 pb-6">
         <div className="flex items-start justify-between gap-2 mb-1">
           <h1 className="text-2xl font-bold text-white flex-1">{hike.name}</h1>
-          <span className={`flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold ${
-            hike.status === 'faite' ? 'bg-white/20 text-white' : 'bg-white/20 text-white'
-          }`}>
+          <span className="flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/20 text-white">
             {hike.status === 'faite' ? '✅ Faite' : '📅 Planifiée'}
           </span>
         </div>
@@ -100,7 +190,9 @@ function ShareContent() {
                 <Calendar size={14} className="text-[#2D6A4F]" />
                 <div>
                   <p className="text-xs text-gray-400">Date</p>
-                  <p className="text-xs font-semibold text-gray-800">{formatDate(hike.date)}</p>
+                  <p className="text-xs font-semibold text-gray-800">
+                    {formatDate(hike.date)}{hike.dateEnd ? ` → ${formatDate(hike.dateEnd)}` : ''}
+                  </p>
                 </div>
               </div>
             )}
@@ -160,6 +252,15 @@ function ShareContent() {
             </div>
           )}
         </div>
+
+        {/* Map */}
+        {hasRoutes && (
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="h-64">
+              <ShareMap routes={hike.routes!} stops={hike.stops} />
+            </div>
+          </div>
+        )}
 
         {/* Description */}
         {hike.description && (
@@ -222,6 +323,34 @@ function ShareContent() {
             <p className="text-sm text-gray-600 leading-relaxed">{hike.comments}</p>
           </div>
         )}
+
+        {/* Saved POIs */}
+        {hike.savedPois && hike.savedPois.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <h2 className="font-semibold text-gray-900 text-sm mb-3">📍 Points d&apos;intérêt</h2>
+            <div className="space-y-2">
+              {hike.savedPois.map((poi) => (
+                <div key={poi.id} className="flex items-center gap-2 py-1.5">
+                  <span className="text-base">📍</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-800">{poi.name}</p>
+                    <p className="text-xs text-[#2D6A4F]">{poi.type}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Import button */}
+        <button
+          onClick={handleImport}
+          disabled={importing || imported}
+          className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-[#2D6A4F] text-white font-semibold text-sm shadow-sm active:scale-[0.98] transition-transform disabled:opacity-60"
+        >
+          <PlusCircle size={18} />
+          {imported ? 'Importé !' : importing ? 'Import en cours...' : 'Ajouter à mes randos'}
+        </button>
 
         {/* Footer */}
         <div className="text-center py-4">

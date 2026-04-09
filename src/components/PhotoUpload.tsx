@@ -1,31 +1,53 @@
 'use client';
 
 import { useRef } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, MapPin } from 'lucide-react';
+import { HikePhoto } from '@/types';
 
 interface Props {
-  photos: string[];
-  onAdd: (dataUrl: string) => void;
+  photos: HikePhoto[];
+  onAdd: (photo: HikePhoto) => void;
   onRemove: (index: number) => void;
 }
 
 export default function PhotoUpload({ photos, onAdd, onRemove }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const result = ev.target?.result as string;
-        if (result) onAdd(result);
-      };
-      reader.readAsDataURL(file);
-    });
+    for (const file of Array.from(files)) {
+      const url = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target?.result as string);
+        reader.readAsDataURL(file);
+      });
 
-    // Reset the input so the same file can be selected again
+      const photo: HikePhoto = { url, takenAt: new Date().toISOString() };
+
+      // 1. Try EXIF GPS metadata from the file itself
+      try {
+        const exifr = await import('exifr');
+        const gps = await exifr.gps(file);
+        if (gps?.latitude && gps?.longitude) {
+          onAdd({ ...photo, coordinate: { lat: gps.latitude, lng: gps.longitude } });
+          continue;
+        }
+      } catch { /* exifr not available or no EXIF */ }
+
+      // 2. Fallback: current GPS position
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => onAdd({ ...photo, coordinate: { lat: pos.coords.latitude, lng: pos.coords.longitude } }),
+          () => onAdd(photo),
+          { enableHighAccuracy: true, timeout: 5000 }
+        );
+      } else {
+        onAdd(photo);
+      }
+    }
+
     if (inputRef.current) inputRef.current.value = '';
   };
 
@@ -34,7 +56,7 @@ export default function PhotoUpload({ photos, onAdd, onRemove }: Props) {
       <div className="grid grid-cols-3 gap-2">
         {photos.map((photo, index) => (
           <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-gray-100">
-            <img src={photo} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
+            <img src={photo.url} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
             <button
               type="button"
               onClick={() => onRemove(index)}
@@ -42,6 +64,11 @@ export default function PhotoUpload({ photos, onAdd, onRemove }: Props) {
             >
               <X size={14} />
             </button>
+            {photo.coordinate && (
+              <div className="absolute bottom-1 left-1 bg-black/50 rounded-full p-0.5">
+                <MapPin size={10} className="text-white" />
+              </div>
+            )}
           </div>
         ))}
 

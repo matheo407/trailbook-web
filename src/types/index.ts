@@ -64,6 +64,19 @@ export interface NamedLocation {
   lng: number;
 }
 
+export interface HikePhoto {
+  url: string;
+  coordinate?: Coordinate;
+  takenAt?: string;
+}
+
+export interface GearTemplate {
+  id: string;
+  name: string;
+  gearIds: string[];
+  createdAt: string;
+}
+
 export interface Hike {
   id: string;
   name: string;
@@ -75,7 +88,7 @@ export interface Hike {
   distance?: number;
   elevation?: number;
   difficulty?: Difficulty;
-  photos: string[];
+  photos: HikePhoto[];
   companionIds: string[];
   comments?: string;
   rating?: number;

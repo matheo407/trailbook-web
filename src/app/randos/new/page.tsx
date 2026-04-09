@@ -11,7 +11,7 @@ import RatingStars from '@/components/RatingStars';
 import MultiRouteDrawer from '@/components/MultiRouteDrawer';
 import PlaceSearch, { PlaceResult } from '@/components/PlaceSearch';
 import TagInput from '@/components/TagInput';
-import { RouteSegment, Difficulty, HikeStatus, NamedLocation } from '@/types';
+import { RouteSegment, Difficulty, HikeStatus, NamedLocation, HikePhoto } from '@/types';
 import { genId } from '@/lib/utils';
 import { ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -40,7 +40,7 @@ export default function NewHikePage() {
   const [description, setDescription] = useState('');
   const [rating, setRating] = useState(0);
   const [companionIds, setCompanionIds] = useState<string[]>([]);
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<HikePhoto[]>([]);
   const [routes, setRoutes] = useState<RouteSegment[]>([{ id: genId(), name: 'Tracé principal', coordinates: [] }]);
   const [comments, setComments] = useState('');
   const [departureLocation, setDepartureLocation] = useState<NamedLocation | undefined>();
@@ -241,7 +241,7 @@ export default function NewHikePage() {
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1.5">Photos</label>
           <PhotoUpload photos={photos}
-            onAdd={(url) => setPhotos([...photos, url])}
+            onAdd={(photo) => setPhotos([...photos, photo])}
             onRemove={(idx) => setPhotos(photos.filter((_, i) => i !== idx))} />
         </div>
 

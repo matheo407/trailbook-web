@@ -6,16 +6,16 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ChevronLeft, Plus, Trash2, ChevronUp, ChevronDown,
-  Download, UtensilsCrossed, Coffee, Tent, Eye, MapPin, Check, Map, X
+  Download, UtensilsCrossed, Coffee, Tent, Eye, MapPin, Check, Map, X, LayoutTemplate
 } from 'lucide-react';
 import { useHikes } from '@/hooks/useHikes';
 import { useStops } from '@/hooks/useStops';
 import { useGear } from '@/hooks/useGear';
 import { useCompanions } from '@/hooks/useCompanions';
 import RouteMap from '@/components/RouteMap';
-import { Coordinate, Hike, Stop, StopType, GearItem, RouteSegment } from '@/types';
+import { Coordinate, Hike, Stop, StopType, GearItem, GearTemplate, RouteSegment } from '@/types';
 import { genId, formatDuration } from '@/lib/utils';
-import { saveStop } from '@/lib/db';
+import { saveStop, getAllGearTemplates } from '@/lib/db';
 import { generateHikeMarkdown } from '@/lib/markdown';
 
 const StopMapPicker = dynamic(() => import('@/components/StopMapPickerInner'), { ssr: false });
@@ -61,7 +61,21 @@ export default function PlanPage() {
   const [addingStop, setAddingStop] = useState(false);
   const [editingStopId, setEditingStopId] = useState<string | null>(null);
   const [editingStopData, setEditingStopData] = useState<StopFormData>(defaultForm);
-  const [activeTab, setActiveTab] = useState<'etapes' | 'materiel'>('etapes');
+  const [activeTab, setActiveTab] = useState<'etapes' | 'materiel' | 'checklist'>('etapes');
+  const [templates, setTemplates] = useState<GearTemplate[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [checked, setChecked] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {};
+    try { return JSON.parse(localStorage.getItem(`checklist-${id}`) || '{}'); } catch { return {}; }
+  });
+
+  const toggleChecked = (gearId: string) => {
+    setChecked((c) => {
+      const next = { ...c, [gearId]: !c[gearId] };
+      try { localStorage.setItem(`checklist-${id}`, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined' && id) {
@@ -69,6 +83,7 @@ export default function PlanPage() {
         if (h) setHike(h);
         else router.push('/randos');
       });
+      getAllGearTemplates().then(setTemplates);
     }
   }, [id, getHike, router]);
 
@@ -147,6 +162,20 @@ export default function PlanPage() {
     await updateHike(hike.id, { gear: newGear });
   };
 
+  const applyTemplate = async (template: GearTemplate) => {
+    if (!hike) return;
+    const newGear = [...hike.gear];
+    for (const gearId of template.gearIds) {
+      if (!newGear.find((g) => g.gearId === gearId)) {
+        newGear.push({ gearId, packed: true, quantity: 1 });
+      }
+    }
+    const updated = { ...hike, gear: newGear };
+    setHike(updated);
+    await updateHike(hike.id, { gear: newGear });
+    setShowTemplates(false);
+  };
+
   const handleExportMarkdown = () => {
     if (!hike) return;
     const md = generateHikeMarkdown(hike, stops, companions, gearItems);
@@ -215,6 +244,16 @@ export default function PlanPage() {
             }`}
           >
             Matériel ({hike.gear.filter((g) => g.packed).length}/{gearItems.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('checklist')}
+            className={`py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'checklist'
+                ? 'border-[#2D6A4F] text-[#2D6A4F]'
+                : 'border-transparent text-gray-500'
+            }`}
+          >
+            Checklist
           </button>
         </div>
       </div>
@@ -343,9 +382,93 @@ export default function PlanPage() {
         </div>
       )}
 
+      {/* Tab: Checklist */}
+      {activeTab === 'checklist' && (
+        <div className="px-4 pt-4 space-y-2 pb-8">
+          {(() => {
+            const selectedGear = hike.gear
+              .filter((g) => g.packed)
+              .map((g) => ({ hikeGear: g, item: gearItems.find((i) => i.id === g.gearId) }))
+              .filter((x) => x.item);
+
+            if (selectedGear.length === 0) {
+              return (
+                <div className="text-center py-10 bg-white rounded-2xl border border-gray-100">
+                  <span className="text-4xl">✅</span>
+                  <p className="text-gray-500 text-sm mt-3">Aucun matériel sélectionné</p>
+                  <p className="text-gray-400 text-xs mt-1">Sélectionne du matériel dans l&apos;onglet Matériel</p>
+                </div>
+              );
+            }
+
+            const doneCount = selectedGear.filter((x) => checked[x.hikeGear.gearId]).length;
+
+            return (
+              <>
+                <div className="flex items-center justify-between bg-[#2D6A4F]/10 rounded-2xl px-4 py-3 mb-2">
+                  <span className="text-sm font-semibold text-[#2D6A4F]">Vérifié</span>
+                  <span className="text-sm font-bold text-[#2D6A4F]">{doneCount} / {selectedGear.length}</span>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50">
+                  {selectedGear.map(({ hikeGear, item }) => {
+                    const isChecked = checked[hikeGear.gearId] ?? false;
+                    return (
+                      <button
+                        key={hikeGear.gearId}
+                        type="button"
+                        onClick={() => toggleChecked(hikeGear.gearId)}
+                        className="w-full flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 transition-colors text-left"
+                      >
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                          isChecked ? 'bg-[#2D6A4F] border-[#2D6A4F]' : 'border-gray-300'
+                        }`}>
+                          {isChecked && <Check size={13} strokeWidth={3} className="text-white" />}
+                        </div>
+                        <span className={`flex-1 text-sm font-medium transition-colors ${isChecked ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                          {item!.name}
+                        </span>
+                        {hikeGear.quantity > 1 && (
+                          <span className="text-xs text-gray-400">×{hikeGear.quantity}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Tab: Matériel */}
       {activeTab === 'materiel' && (
         <div className="px-4 pt-4 space-y-4">
+          {/* Templates */}
+          {templates.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowTemplates((v) => !v)}
+                className="flex items-center gap-2 text-sm font-medium text-[#2D6A4F] bg-[#2D6A4F]/10 px-4 py-2.5 rounded-2xl w-full"
+              >
+                <LayoutTemplate size={16} />
+                Appliquer un template
+              </button>
+              {showTemplates && (
+                <div className="mt-2 bg-white rounded-2xl border border-gray-100 divide-y divide-gray-50 overflow-hidden">
+                  {templates.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => applyTemplate(t)}
+                      className="w-full flex items-center justify-between px-4 py-3 text-left active:bg-gray-50"
+                    >
+                      <span className="text-sm font-medium text-gray-800">{t.name}</span>
+                      <span className="text-xs text-gray-400">{t.gearIds.length} articles</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {/* Bag weight summary */}
           {(() => {
             const totalWeight = hike.gear

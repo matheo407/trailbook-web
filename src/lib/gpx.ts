@@ -61,3 +61,48 @@ function escapeXml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+import { Hike, Stop } from '@/types';
+
+export function exportHikeGPX(hike: Hike, stops: Stop[]): string {
+  const now = new Date().toISOString();
+  const lines: string[] = [];
+
+  lines.push('<?xml version="1.0" encoding="UTF-8"?>');
+  lines.push('<gpx version="1.1" creator="TrailBook" xmlns="http://www.topografix.com/GPX/1/1">');
+  lines.push('  <metadata>');
+  lines.push(`    <name>${escapeXml(hike.name)}</name>`);
+  lines.push(`    <time>${now}</time>`);
+  lines.push('  </metadata>');
+
+  // Waypoints — stops with a coordinate
+  for (const stop of stops) {
+    if (!stop.coordinate) continue;
+    lines.push(`  <wpt lat="${stop.coordinate.lat}" lon="${stop.coordinate.lng}">`);
+    if (stop.coordinate.ele !== undefined) lines.push(`    <ele>${stop.coordinate.ele.toFixed(1)}</ele>`);
+    lines.push(`    <name>${escapeXml(stop.name)}</name>`);
+    if (stop.notes) lines.push(`    <desc>${escapeXml(stop.notes)}</desc>`);
+    lines.push(`    <type>${escapeXml(stop.type)}</type>`);
+    lines.push('  </wpt>');
+  }
+
+  // Tracks — one per route segment
+  for (const segment of hike.routes) {
+    if (segment.coordinates.length === 0) continue;
+    lines.push('  <trk>');
+    lines.push(`    <name>${escapeXml(segment.name)}</name>`);
+    lines.push('    <trkseg>');
+    for (const c of segment.coordinates) {
+      if (c.ele !== undefined) {
+        lines.push(`      <trkpt lat="${c.lat}" lon="${c.lng}"><ele>${c.ele.toFixed(1)}</ele></trkpt>`);
+      } else {
+        lines.push(`      <trkpt lat="${c.lat}" lon="${c.lng}"/>`);
+      }
+    }
+    lines.push('    </trkseg>');
+    lines.push('  </trk>');
+  }
+
+  lines.push('</gpx>');
+  return lines.join('\n');
+}

@@ -26,11 +26,13 @@ const SEGMENT_COLORS = ['#2D6A4F', '#1971C2', '#F03E3E', '#F4A261', '#845EF7', '
 interface Props {
   routes: RouteSegment[];
   stops?: Stop[];
+  userPosition?: { lat: number; lng: number };
 }
 
-export default function RouteMapInner({ routes, stops = [] }: Props) {
+export default function RouteMapInner({ routes, stops = [], userPosition }: Props) {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
+  const userMarkerRef = useRef<L.Marker | null>(null);
 
   const allCoords = routes.flatMap((s) => s.coordinates);
   const center = allCoords.length > 0
@@ -77,6 +79,21 @@ export default function RouteMapInner({ routes, stops = [] }: Props) {
       mapRef.current.fitBounds(bounds, { padding: [20, 20] });
     }
   }, [routes, stops, allCoords]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (userMarkerRef.current) { userMarkerRef.current.remove(); userMarkerRef.current = null; }
+    if (!userPosition) return;
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:16px;height:16px;background:#2563EB;border:3px solid white;border-radius:50%;box-shadow:0 0 0 4px rgba(37,99,235,0.3)"></div>`,
+      iconSize: [16, 16], iconAnchor: [8, 8],
+    });
+    userMarkerRef.current = L.marker([userPosition.lat, userPosition.lng], { icon, zIndexOffset: 1000 });
+    userMarkerRef.current.bindPopup('📍 Ma position');
+    userMarkerRef.current.addTo(mapRef.current);
+    mapRef.current.setView([userPosition.lat, userPosition.lng], Math.max(mapRef.current.getZoom(), 14));
+  }, [userPosition]);
 
   return (
     <MapContainer

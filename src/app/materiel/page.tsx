@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, Pencil, Trash2, Package, X, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Pencil, Trash2, Package, X, Check, LayoutTemplate } from 'lucide-react';
 import { useGear } from '@/hooks/useGear';
-import { GearCategory, GearItem } from '@/types';
+import { GearCategory, GearItem, GearTemplate } from '@/types';
+import { getAllGearTemplates, saveGearTemplate, deleteGearTemplate } from '@/lib/db';
+import { genId } from '@/lib/utils';
 
 const categories: GearCategory[] = [
   'vêtements', 'nourriture', 'équipement', 'sécurité', 'navigation', 'médical', 'autre'
@@ -50,6 +52,29 @@ export default function MaterielPage() {
   const [form, setForm] = useState<GearFormData>(defaultForm);
   const [saving, setSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<GearTemplate[]>([]);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateSelection, setTemplateSelection] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') getAllGearTemplates().then(setTemplates);
+  }, []);
+
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim() || templateSelection.length === 0) return;
+    const t: GearTemplate = { id: genId(), name: templateName.trim(), gearIds: templateSelection, createdAt: new Date().toISOString() };
+    await saveGearTemplate(t);
+    setTemplates((prev) => [...prev, t]);
+    setTemplateName('');
+    setTemplateSelection([]);
+    setShowTemplateModal(false);
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    await deleteGearTemplate(id);
+    setTemplates((prev) => prev.filter((t) => t.id !== id));
+  };
 
   const filtered = filterCategory === 'tous'
     ? gearItems
@@ -120,8 +145,19 @@ export default function MaterielPage() {
     <div className="min-h-screen bg-[#F8F9FA] pb-28">
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 py-3 pt-12">
-        <h1 className="text-lg font-bold text-gray-900">Matériel</h1>
-        <p className="text-xs text-gray-500">{gearItems.length} article{gearItems.length !== 1 ? 's' : ''}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold text-gray-900">Matériel</h1>
+            <p className="text-xs text-gray-500">{gearItems.length} article{gearItems.length !== 1 ? 's' : ''}</p>
+          </div>
+          <button
+            onClick={() => setShowTemplateModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#2D6A4F]/10 text-[#2D6A4F] text-xs font-semibold"
+          >
+            <LayoutTemplate size={14} />
+            Templates {templates.length > 0 && `(${templates.length})`}
+          </button>
+        </div>
       </div>
 
       {/* Category filter */}
@@ -387,6 +423,83 @@ export default function MaterielPage() {
               >
                 {saving ? 'Enregistrement...' : editingId ? 'Modifier' : 'Ajouter'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Templates Modal */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 flex items-end justify-center" style={{ zIndex: 9999 }}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowTemplateModal(false)} />
+          <div className="relative w-full max-w-lg bg-white rounded-t-3xl flex flex-col" style={{ maxHeight: '85dvh' }}>
+            <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-bold text-gray-900">Templates de matériel</h2>
+              <button onClick={() => setShowTemplateModal(false)} className="p-1 text-gray-400"><X size={22} /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+              {/* Existing templates */}
+              {templates.length > 0 && (
+                <div className="space-y-2">
+                  {templates.map((t) => (
+                    <div key={t.id} className="flex items-center justify-between bg-gray-50 rounded-2xl px-4 py-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{t.name}</p>
+                        <p className="text-xs text-gray-400">{t.gearIds.length} articles</p>
+                      </div>
+                      <button onClick={() => handleDeleteTemplate(t.id)} className="p-2 text-red-400">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Create new template */}
+              <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
+                <p className="text-sm font-semibold text-gray-700">Nouveau template</p>
+                <input
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#2D6A4F]"
+                  placeholder="Nom du template (ex: Weekend bivouac)"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                />
+                <p className="text-xs text-gray-500 font-medium">Sélectionne les articles à inclure :</p>
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {gearItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setTemplateSelection((s) =>
+                        s.includes(item.id) ? s.filter((id) => id !== item.id) : [...s, item.id]
+                      )}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                        templateSelection.includes(item.id)
+                          ? 'border-[#2D6A4F] bg-[#2D6A4F]/5'
+                          : 'border-gray-100 bg-white'
+                      }`}
+                    >
+                      {item.photo ? (
+                        <img src={item.photo} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                          <Package size={14} className="text-gray-400" />
+                        </div>
+                      )}
+                      <span className="flex-1 text-sm text-gray-800">{item.name}</span>
+                      {templateSelection.includes(item.id) && <Check size={16} className="text-[#2D6A4F] flex-shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={handleSaveTemplate}
+                  disabled={!templateName.trim() || templateSelection.length === 0}
+                  className="w-full py-3 bg-[#2D6A4F] text-white rounded-2xl font-semibold text-sm disabled:opacity-40"
+                >
+                  Sauvegarder ({templateSelection.length} articles)
+                </button>
+              </div>
             </div>
           </div>
         </div>

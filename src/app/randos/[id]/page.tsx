@@ -4,10 +4,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Hike, Companion, GearItem } from '@/types';
-import { getHike, getAllCompanions, getAllGearItems, getStopsForHike } from '@/lib/db';
-import { deleteHike } from '@/lib/db';
-import { generateHikeMarkdown } from '@/lib/markdown';
-import { formatDate, formatDuration } from '@/lib/utils';
+import { getHike, getAllCompanions, getAllGearItems, getStopsForHike, deleteHike } from '@/lib/db';
+import { formatDate, formatDuration, computeTrailInfo } from '@/lib/utils';
 import DifficultyBadge from '@/components/DifficultyBadge';
 import StatusBadge from '@/components/StatusBadge';
 import RatingStars from '@/components/RatingStars';
@@ -19,7 +17,6 @@ import {
   ChevronLeft,
   Pencil,
   Trash2,
-  Download,
   Share2,
   MapPin,
   Calendar,
@@ -32,10 +29,14 @@ import {
   ClipboardList,
   CheckCircle2,
   Circle,
+  Navigation,
+  Download,
 } from 'lucide-react';
 import { Stop } from '@/types';
 import { saveHike } from '@/lib/db';
 import { pushRow } from '@/lib/sync';
+import { compressToEncodedURIComponent } from 'lz-string';
+import { exportHikeGPX } from '@/lib/gpx';
 
 export default function HikeDetailPage() {
   const params = useParams();
@@ -50,6 +51,9 @@ export default function HikeDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [userPosition, setUserPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError, setGpsError] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -89,10 +93,20 @@ export default function HikeDetailPage() {
   const handleShare = async () => {
     if (!hike) return;
     const hikeCompanions = companions.filter((c) => hike.companionIds.includes(c.id));
+
+    // Downsample route coordinates (1 point every 3) to keep URL short
+    const routes = hike.routes
+      .filter((r) => r.coordinates.length > 0)
+      .map((r) => ({
+        name: r.name,
+        coordinates: r.coordinates.filter((_, i) => i % 3 === 0),
+      }));
+
     const data = {
       name: hike.name,
       status: hike.status,
       date: hike.date,
+      dateEnd: hike.dateEnd,
       distance: hike.distance,
       elevation: hike.elevation,
       duration: hike.duration,
@@ -105,21 +119,66 @@ export default function HikeDetailPage() {
       departureLocation: hike.departureLocation ? { name: hike.departureLocation.name } : undefined,
       arrivalLocation: hike.arrivalLocation ? { name: hike.arrivalLocation.name } : undefined,
       companionNames: hikeCompanions.map((c) => c.name),
-      stops: stops.map((s) => ({ name: s.name, type: s.type, notes: s.notes, mealDetails: s.mealDetails, journal: s.journal })),
+      stops: stops.map((s) => ({
+        name: s.name,
+        type: s.type,
+        notes: s.notes,
+        coordinate: s.coordinate,
+        mealDetails: s.mealDetails,
+        journal: s.journal,
+      })),
+      routes,
       savedPois: hike.savedPois,
-      routeCount: hike.routes.filter((r) => r.coordinates.length > 0).length,
       sharedAt: new Date().toISOString(),
     };
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-    const url = `${window.location.origin}/share?d=${encoded}`;
+
+    const compressed = compressToEncodedURIComponent(JSON.stringify(data));
+    const url = `${window.location.origin}/share?d=${compressed}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: hike.name, text: `Découvre ma rando : ${hike.name}`, url });
+        return;
+      } catch {
+        // user cancelled or share failed, fall through to clipboard
+      }
+    }
     try {
       await navigator.clipboard.writeText(url);
     } catch {
-      // fallback: open in new tab
       window.open(url, '_blank');
     }
     setShareCopied(true);
     setTimeout(() => setShareCopied(false), 3000);
+  };
+
+  const handleLocate = () => {
+    if (!navigator.geolocation) { setGpsError('GPS non disponible'); return; }
+    setGpsLoading(true);
+    setGpsError('');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGpsLoading(false);
+      },
+      () => {
+        setGpsError('Position introuvable');
+        setGpsLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const handleExportGPX = () => {
+    if (!hike) return;
+    const gpx = exportHikeGPX(hike, stops);
+    const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${hike.name.replace(/\s+/g, '_')}.gpx`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleToggleStatus = async () => {
@@ -129,18 +188,6 @@ export default function HikeDetailPage() {
     setHike(updated);
     await saveHike(updated);
     pushRow('hikes', updated as unknown as Record<string, unknown>).catch(() => {});
-  };
-
-  const handleExport = () => {
-    if (!hike) return;
-    const markdown = generateHikeMarkdown(hike, stops, companions, gearItems);
-    const blob = new Blob([markdown], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${hike.name.replace(/\s+/g, '_')}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -159,16 +206,7 @@ export default function HikeDetailPage() {
     <div className="min-h-screen bg-[#F8F9FA]">
       {/* Hero */}
       <div className="relative">
-        {hike.photos[0] ? (
-          <div className="h-56 overflow-hidden">
-            <img src={hike.photos[0]} alt={hike.name} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-          </div>
-        ) : (
-          <div className="h-40 bg-gradient-to-br from-[#2D6A4F] to-[#52B788]" />
-        )}
-
-        {/* Header overlay */}
+        <div className="h-40 bg-gradient-to-br from-[#2D6A4F] to-[#52B788]" />
         <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-14 pb-4">
           <Link href="/randos" className="bg-black/30 backdrop-blur-sm rounded-full p-2 text-white">
             <ChevronLeft size={20} />
@@ -300,13 +338,50 @@ export default function HikeDetailPage() {
         {/* Route map */}
         {hike.routes.some((s) => s.coordinates.length > 0) && (
           <section className="mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Map size={16} className="text-[#2D6A4F]" />
-              <h2 className="font-semibold text-gray-900 text-sm">
-                Tracé{hike.routes.filter((s) => s.coordinates.length > 0).length > 1 ? 's' : ''}
-              </h2>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Map size={16} className="text-[#2D6A4F]" />
+                <h2 className="font-semibold text-gray-900 text-sm">
+                  Tracé{hike.routes.filter((s) => s.coordinates.length > 0).length > 1 ? 's' : ''}
+                </h2>
+              </div>
+              <button
+                onClick={handleLocate}
+                disabled={gpsLoading}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                  userPosition
+                    ? 'bg-blue-50 border-blue-200 text-blue-600'
+                    : 'bg-white border-gray-200 text-gray-600'
+                } disabled:opacity-50`}
+              >
+                <Navigation size={13} className={gpsLoading ? 'animate-pulse' : ''} />
+                {gpsLoading ? 'Localisation...' : userPosition ? 'Ma position ✓' : 'Me localiser'}
+              </button>
             </div>
-            <RouteMap routes={hike.routes} stops={stops} />
+            {gpsError && <p className="text-xs text-red-500 mb-2">{gpsError}</p>}
+            <RouteMap routes={hike.routes} stops={stops} userPosition={userPosition ?? undefined} />
+            {userPosition && (() => {
+              const info = computeTrailInfo(userPosition.lat, userPosition.lng, hike.routes, stops);
+              if (!info) return null;
+              const km = info.distanceM >= 1000
+                ? `${(info.distanceM / 1000).toFixed(1)} km`
+                : `${Math.round(info.distanceM)} m`;
+              return (
+                <div className={`mt-2 rounded-2xl px-4 py-3 ${info.offTrackM > 300 ? 'bg-orange-50 border border-orange-200' : 'bg-blue-50 border border-blue-100'}`}>
+                  {info.offTrackM > 300 && (
+                    <p className="text-xs text-orange-600 font-medium mb-1">⚠️ Tu es à {info.offTrackM}m du tracé</p>
+                  )}
+                  <p className="text-xs font-semibold text-gray-700 mb-1">
+                    Prochain arrêt : <span className="text-[#2D6A4F]">{info.nextStopName}</span>
+                  </p>
+                  <div className="flex gap-3 text-xs text-gray-600">
+                    <span>📏 {km}</span>
+                    {info.elevationGain > 0 && <span>⬆️ +{info.elevationGain}m</span>}
+                    {info.elevationLoss > 0 && <span>⬇️ -{info.elevationLoss}m</span>}
+                  </div>
+                </div>
+              );
+            })()}
           </section>
         )}
 
@@ -364,17 +439,22 @@ export default function HikeDetailPage() {
         )}
 
         {/* Photos */}
-        {hike.photos.length > 1 && (
+        {hike.photos.length > 0 && (
           <section className="bg-white rounded-2xl shadow-sm p-4 mb-4 border border-gray-50">
             <h2 className="font-semibold text-gray-900 text-sm mb-3">Photos ({hike.photos.length})</h2>
             <div className="grid grid-cols-3 gap-2">
               {hike.photos.map((photo, index) => (
                 <button
                   key={index}
-                  onClick={() => setActivePhoto(photo)}
-                  className="aspect-square rounded-xl overflow-hidden bg-gray-100"
+                  onClick={() => setActivePhoto(photo.url)}
+                  className="aspect-square rounded-xl overflow-hidden bg-gray-100 relative"
                 >
-                  <img src={photo} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
+                  <img src={photo.url} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
+                  {photo.coordinate && (
+                    <div className="absolute bottom-1 right-1 bg-black/50 rounded-full p-0.5">
+                      <span className="text-[10px]">📍</span>
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -437,18 +517,20 @@ export default function HikeDetailPage() {
         <div className="flex gap-2 pb-6">
           <button
             onClick={handleShare}
-            className="flex items-center justify-center gap-1.5 py-3 px-3 rounded-2xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold shadow-sm active:scale-[0.98] transition-transform"
+            className="flex-1 flex items-center justify-center gap-1.5 py-3 px-3 rounded-2xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold shadow-sm active:scale-[0.98] transition-transform"
           >
             <Share2 size={15} />
             {shareCopied ? 'Copié !' : 'Partager'}
           </button>
-          <button
-            onClick={handleExport}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold shadow-sm active:scale-[0.98] transition-transform"
-          >
-            <Download size={16} />
-            Exporter .md
-          </button>
+          {hike.routes.some((r) => r.coordinates.length > 0) && (
+            <button
+              onClick={handleExportGPX}
+              className="flex items-center justify-center gap-1.5 py-3 px-3 rounded-2xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold shadow-sm active:scale-[0.98] transition-transform"
+            >
+              <Download size={15} />
+              GPX
+            </button>
+          )}
           <button
             onClick={handleDelete}
             disabled={deleting}

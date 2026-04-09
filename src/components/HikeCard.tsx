@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function HikeCard({ hike }: Props) {
-  const firstPhoto = hike.photos?.[0];
+  const firstPhoto = hike.photos?.[0]?.url;
 
   return (
     <Link href={`/randos/${hike.id}`}>

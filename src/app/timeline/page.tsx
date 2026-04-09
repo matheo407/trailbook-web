@@ -68,10 +68,10 @@ export default function TimelinePage() {
                   <Link key={hike.id} href={`/randos/${hike.id}`}>
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden active:scale-[0.99] transition-transform">
                       {/* Photo */}
-                      {hike.photos[0] ? (
+                      {hike.photos[0]?.url ? (
                         <div className="h-44 overflow-hidden relative">
                           <img
-                            src={hike.photos[0]}
+                            src={hike.photos[0].url}
                             alt={hike.name}
                             className="w-full h-full object-cover"
                           />
@@ -142,7 +142,7 @@ export default function TimelinePage() {
                           <div className="flex gap-1.5 mt-2 overflow-x-auto">
                             {hike.photos.slice(1, 5).map((photo, i) => (
                               <div key={i} className="w-14 h-14 flex-shrink-0 rounded-xl overflow-hidden">
-                                <img src={photo} alt="" className="w-full h-full object-cover" />
+                                <img src={photo.url} alt="" className="w-full h-full object-cover" />
                               </div>
                             ))}
                             {hike.photos.length > 5 && (

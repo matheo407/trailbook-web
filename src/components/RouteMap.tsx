@@ -9,9 +9,10 @@ interface Props {
   routes: RouteSegment[];
   stops?: Stop[];
   height?: number;
+  userPosition?: { lat: number; lng: number };
 }
 
-export default function RouteMap({ routes, stops = [], height = 260 }: Props) {
+export default function RouteMap({ routes, stops = [], height = 260, userPosition }: Props) {
   const hasCoords = routes.some((s) => s.coordinates.length > 0);
   if (!hasCoords) {
     return (
@@ -29,7 +30,7 @@ export default function RouteMap({ routes, stops = [], height = 260 }: Props) {
 
   return (
     <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm" style={{ height }}>
-      <RouteMapInner routes={routes} stops={stops} />
+      <RouteMapInner routes={routes} stops={stops} userPosition={userPosition} />
     </div>
   );
 }
